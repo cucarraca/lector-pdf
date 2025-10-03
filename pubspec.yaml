@@ -1,0 +1,55 @@
+name: lector_pdf
+description: "Lector de PDF con audio y traducción automática"
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.9.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  
+  # PDF
+  syncfusion_flutter_pdfviewer: ^27.2.5
+  syncfusion_flutter_pdf: ^27.2.5
+  
+  # File picker
+  file_picker: ^8.1.6
+  
+  # Text to Speech
+  flutter_tts: ^4.2.0
+  
+  # Storage
+  shared_preferences: ^2.3.4
+  path_provider: ^2.1.5
+  
+  # Translation
+  translator: ^1.0.0
+  
+  # Audio export
+  audioplayers: ^6.1.0
+  
+  # State management
+  provider: ^6.1.2
+  
+  # JSON
+  json_annotation: ^4.9.0
+  
+  # Permission handler
+  permission_handler: ^11.3.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+  json_serializable: ^6.9.0
+  build_runner: ^2.4.14
+
+flutter:
+  uses-material-design: true
+  
+  assets:
+    - assets/images/
