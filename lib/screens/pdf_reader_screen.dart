@@ -19,9 +19,12 @@ class PdfReaderScreen extends StatefulWidget {
 class _PdfReaderScreenState extends State<PdfReaderScreen> {
   final PdfViewerController _pdfViewerController = PdfViewerController();
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  final ScrollController _textScrollController = ScrollController();
   int _currentPage = 1;
   String _currentPageText = '';
   bool _isLoadingText = false;
+  int _selectedTextStartIndex = 0; // Índice desde donde comenzar la lectura
+  double _dividerPosition = 0.5; // Posición del divisor (50% por defecto)
 
   @override
   void initState() {
@@ -68,7 +71,17 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
     }
 
     final provider = Provider.of<AppProvider>(context, listen: false);
-    await provider.speak(_currentPageText);
+    // Leer desde el índice seleccionado
+    final textToRead = _currentPageText.substring(_selectedTextStartIndex);
+    await provider.speak(textToRead);
+  }
+
+  // Nueva función para leer desde un punto específico del texto
+  void _readFromPosition(int startIndex) {
+    setState(() {
+      _selectedTextStartIndex = startIndex;
+    });
+    _readCurrentPage();
   }
 
   Future<void> _translateAndRead() async {
@@ -176,13 +189,231 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
       ),
       body: Column(
         children: [
+          // Vista dual: PDF arriba + Texto abajo
           Expanded(
-            child: SfPdfViewer.file(
-              File(widget.book.filePath),
-              controller: _pdfViewerController,
-              onPageChanged: _onPageChanged,
+            child: Column(
+              children: [
+                // Sección del visor PDF (ajustable)
+                Expanded(
+                  flex: (_dividerPosition * 100).round(),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      border: Border(
+                        bottom: BorderSide(
+                          color: Theme.of(context).dividerColor,
+                          width: 2,
+                        ),
+                      ),
+                    ),
+                    child: Stack(
+                      children: [
+                        SfPdfViewer.file(
+                          File(widget.book.filePath),
+                          controller: _pdfViewerController,
+                          onPageChanged: _onPageChanged,
+                        ),
+                        // Indicador de página sobre el PDF
+                        Positioned(
+                          bottom: 8,
+                          left: 0,
+                          right: 0,
+                          child: Center(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.black54,
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: Text(
+                                'Página $_currentPage de ${widget.book.totalPages}',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                
+                // Divisor ajustable
+                GestureDetector(
+                  onVerticalDragUpdate: (details) {
+                    setState(() {
+                      final screenHeight = MediaQuery.of(context).size.height;
+                      _dividerPosition += details.delta.dy / screenHeight;
+                      _dividerPosition = _dividerPosition.clamp(0.2, 0.8);
+                    });
+                  },
+                  child: Container(
+                    height: 30,
+                    color: Theme.of(context).primaryColor.withOpacity(0.1),
+                    child: Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).primaryColor,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                
+                // Sección de texto seleccionable
+                Expanded(
+                  flex: ((1 - _dividerPosition) * 100).round(),
+                  child: Container(
+                    color: Theme.of(context).cardColor,
+                    child: _isLoadingText
+                        ? const Center(
+                            child: CircularProgressIndicator(),
+                          )
+                        : _currentPageText.isEmpty
+                            ? Center(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(20),
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.text_fields,
+                                        size: 48,
+                                        color: Theme.of(context)
+                                            .textTheme
+                                            .bodyLarge
+                                            ?.color
+                                            ?.withOpacity(0.5),
+                                      ),
+                                      const SizedBox(height: 16),
+                                      Text(
+                                        'No se pudo extraer texto de esta página',
+                                        style: Theme.of(context).textTheme.bodyLarge,
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              )
+                            : Column(
+                                children: [
+                                  // Header de la sección de texto
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 8,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Theme.of(context)
+                                          .primaryColor
+                                          .withOpacity(0.1),
+                                      border: Border(
+                                        bottom: BorderSide(
+                                          color: Theme.of(context).dividerColor,
+                                        ),
+                                      ),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        const Icon(
+                                          Icons.text_snippet,
+                                          size: 20,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          'Texto seleccionable',
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .titleSmall,
+                                        ),
+                                        const Spacer(),
+                                        Text(
+                                          '${_currentPageText.length} caracteres',
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .bodySmall,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  // Texto seleccionable con scroll
+                                  Expanded(
+                                    child: Scrollbar(
+                                      controller: _textScrollController,
+                                      thumbVisibility: true,
+                                      child: SingleChildScrollView(
+                                        controller: _textScrollController,
+                                        padding: const EdgeInsets.all(16),
+                                        child: SelectableText(
+                                          _currentPageText,
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .bodyMedium
+                                              ?.copyWith(
+                                                height: 1.5,
+                                                fontSize: 16,
+                                              ),
+                                          onTap: () {
+                                            // Al tocar sin selección, leer desde el inicio
+                                            _readFromPosition(0);
+                                          },
+                                          onSelectionChanged: (selection, cause) {
+                                            if (selection.start != selection.end) {
+                                              // Cuando se selecciona texto
+                                              setState(() {
+                                                _selectedTextStartIndex = selection.start;
+                                              });
+                                            }
+                                          },
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  // Hint de uso
+                                  Container(
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: Theme.of(context)
+                                          .primaryColor
+                                          .withOpacity(0.1),
+                                      border: Border(
+                                        top: BorderSide(
+                                          color: Theme.of(context).dividerColor,
+                                        ),
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        const Icon(
+                                          Icons.touch_app,
+                                          size: 16,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          'Toca el texto para leer desde ahí',
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .bodySmall,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                  ),
+                ),
+              ],
             ),
           ),
+          // Controles de reproducción
           ReaderControls(
             isPlaying: context.watch<AppProvider>().isPlaying,
             isTranslating: context.watch<AppProvider>().isTranslating,
@@ -192,6 +423,9 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
             },
             onStop: () {
               Provider.of<AppProvider>(context, listen: false).stop();
+              setState(() {
+                _selectedTextStartIndex = 0; // Reset al detener
+              });
             },
             onTranslate: _translateAndRead,
             onAddBookmark: _addBookmark,
@@ -207,6 +441,7 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
   @override
   void dispose() {
     _pdfViewerController.dispose();
+    _textScrollController.dispose();
     super.dispose();
   }
 }

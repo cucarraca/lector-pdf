@@ -1,0 +1,265 @@
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                    MOCKUPS - OPCIONES DE LECTOR PDF                       ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+
+═══════════════════════════════════════════════════════════════════════════
+  OPCIÓN 1: DUAL VIEW (RECOMENDADA) ⭐⭐⭐⭐⭐
+═══════════════════════════════════════════════════════════════════════════
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ [<] Mi Libro.pdf                                      [☰] [★] [⚙]      │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  ┌───────────────────────────────────────────────────────────────┐    │
+│  │                    VISOR PDF                                  │    │
+│  │                                                               │    │
+│  │   ╔═════════════════════════════════════════════════════╗    │    │
+│  │   ║  Capítulo 1: Introducción                          ║    │    │
+│  │   ║                                                     ║    │    │
+│  │   ║  Este es el contenido del PDF con su formato       ║    │    │
+│  │   ║  original, imágenes, y diseño.                     ║    │    │
+│  │   ║                                                     ║    │    │
+│  │   ║  [Imagen: Diagrama]                                ║    │    │
+│  │   ║                                                     ║    │    │
+│  │   ╚═════════════════════════════════════════════════════╝    │    │
+│  │                                                               │    │
+│  └───────────────────────────────────────────────────────────────┘    │
+│                       Página 3 de 150                                  │
+│                                                                         │
+│  ┌─────────── TEXTO SELECCIONABLE ─────────────┐ [▲]                  │
+│  │                                              │                      │
+│  │  Capítulo 1: Introducción                   │ 50%                  │
+│  │                                              │                      │
+│  │  Este es el contenido del PDF con su        │                      │
+│  │  formato original, imágenes, y diseño.      │ [▼]                  │
+│  │  👆 ← Toca aquí para empezar a leer         │                      │
+│  │                                              │                      │
+│  │  Lorem ipsum dolor sit amet, consectetur    │                      │
+│  │  adipiscing elit. Sed do eiusmod tempor...  │                      │
+│  │                                              │                      │
+│  └──────────────────────────────────────────────┘                      │
+│                                                                         │
+├─────────────────────────────────────────────────────────────────────────┤
+│  [▶ Play]  [⏸ Pausa]  [⏹ Stop]  [🔊]  [⚡×1.0]  [🌐 ES]  [🎨]        │
+└─────────────────────────────────────────────────────────────────────────┘
+
+FUNCIONAMIENTO:
+• Deslizas arriba/abajo para ver PDF completo
+• Deslizas en la sección de texto para navegar por el texto
+• TOCAS cualquier palabra/línea en el texto → Comienza a leer desde ahí
+• El texto se resalta mientras se lee
+• Puedes ajustar el tamaño del visor con un divisor deslizable
+
+
+═══════════════════════════════════════════════════════════════════════════
+  OPCIÓN 2: MODO TOGGLE (CAMBIO CON BOTÓN) ⭐⭐⭐⭐
+═══════════════════════════════════════════════════════════════════════════
+
+MODO A: VISTA PDF
+┌─────────────────────────────────────────────────────────────────────────┐
+│ [<] Mi Libro.pdf            [📄 PDF] [📝 Texto]         [★] [⚙]        │
+│                                 ^^^^^ activo                             │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│                                                                         │
+│   ╔═════════════════════════════════════════════════════════════╗      │
+│   ║                                                             ║      │
+│   ║    Capítulo 1: Introducción                                ║      │
+│   ║                                                             ║      │
+│   ║    Este es el contenido del PDF con su formato             ║      │
+│   ║    original, imágenes, y diseño.                           ║      │
+│   ║                                                             ║      │
+│   ║    [Imagen: Diagrama]                                      ║      │
+│   ║                                                             ║      │
+│   ║    Lorem ipsum dolor sit amet...                           ║      │
+│   ║                                                             ║      │
+│   ╚═════════════════════════════════════════════════════════════╝      │
+│                                                                         │
+│                        Página 3 de 150                                  │
+│                                                                         │
+│  💡 Presiona [📝 Texto] para seleccionar desde dónde leer               │
+│                                                                         │
+├─────────────────────────────────────────────────────────────────────────┤
+│  [▶ Play]  [⏸ Pausa]  [⏹ Stop]  [🔊]  [⚡×1.0]  [🌐 ES]  [🎨]        │
+└─────────────────────────────────────────────────────────────────────────┘
+
+
+MODO B: VISTA TEXTO (después de presionar el botón)
+┌─────────────────────────────────────────────────────────────────────────┐
+│ [<] Mi Libro.pdf            [📄 PDF] [📝 Texto]         [★] [⚙]        │
+│                                       ^^^^^^^^ activo                    │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  ┌────────────────────────────────────────────────────────────┐        │
+│  │                                                             │        │
+│  │  Capítulo 1: Introducción                                  │        │
+│  │  ═══════════════════════════                               │        │
+│  │                                                             │        │
+│  │  Este es el contenido del PDF con su formato               │        │
+│  │  original, imágenes, y diseño.                             │        │
+│  │                                                             │        │
+│  │  Lorem ipsum dolor sit amet, consectetur adipiscing        │        │
+│  │  elit. Sed do eiusmod tempor incididunt ut labore et       │        │
+│  │  dolore magna aliqua. 👆 Toca aquí para empezar            │        │
+│  │                                                             │        │
+│  │  Ut enim ad minim veniam, quis nostrud exercitation        │        │
+│  │  ullamco laboris nisi ut aliquip ex ea commodo             │        │
+│  │  consequat.                                                 │        │
+│  │                                                             │        │
+│  │  Duis aute irure dolor in reprehenderit in voluptate       │        │
+│  │  velit esse cillum dolore eu fugiat nulla pariatur.        │        │
+│  │                                                             │        │
+│  └────────────────────────────────────────────────────────────┘        │
+│                                                                         │
+│                      Página 3 de 150 (45%)                              │
+│                                                                         │
+│  💡 Toca cualquier palabra para comenzar desde ahí                      │
+│                                                                         │
+├─────────────────────────────────────────────────────────────────────────┤
+│  [▶ Play]  [⏸ Pausa]  [⏹ Stop]  [🔊]  [⚡×1.0]  [🌐 ES]  [🎨]        │
+└─────────────────────────────────────────────────────────────────────────┘
+
+FUNCIONAMIENTO:
+• Botón toggle arriba para cambiar entre PDF y Texto
+• En modo PDF: Solo visualización (como ahora)
+• En modo Texto: TODO es seleccionable, tocas donde quieres empezar
+• Cambias de modo según lo que necesites
+
+
+═══════════════════════════════════════════════════════════════════════════
+  OPCIÓN 3: SOLO TEXTO (MÁS SIMPLE) ⭐⭐
+═══════════════════════════════════════════════════════════════════════════
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ [<] Mi Libro.pdf                                      [★] [⚙]           │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  ┌────────────────────────────────────────────────────────────┐        │
+│  │                                                             │        │
+│  │  Capítulo 1: Introducción                                  │        │
+│  │  ═══════════════════════════                               │        │
+│  │                                                             │        │
+│  │  Este es el contenido del PDF extraído como texto          │        │
+│  │  puro. No verás el formato original ni las imágenes.       │        │
+│  │                                                             │        │
+│  │  Lorem ipsum dolor sit amet, consectetur adipiscing        │        │
+│  │  elit. Sed do eiusmod tempor incididunt ut labore et       │        │
+│  │  dolore magna aliqua. 👆 Toca AQUÍ para empezar            │        │
+│  │                                                             │        │
+│  │  Ut enim ad minim veniam, quis nostrud exercitation        │        │
+│  │  ullamco laboris nisi ut aliquip ex ea commodo             │        │
+│  │  consequat.                                                 │        │
+│  │                                                             │        │
+│  │  Duis aute irure dolor in reprehenderit in voluptate       │        │
+│  │  velit esse cillum dolore eu fugiat nulla pariatur.        │        │
+│  │  Excepteur sint occaecat cupidatat non proident, sunt      │        │
+│  │  in culpa qui officia deserunt mollit anim id est          │        │
+│  │  laborum.                                                   │        │
+│  │                                                             │        │
+│  │  Sed ut perspiciatis unde omnis iste natus error sit       │        │
+│  │  voluptatem accusantium doloremque laudantium...           │        │
+│  │                                                             │        │
+│  └────────────────────────────────────────────────────────────┘        │
+│                                                                         │
+│                      Página 3 de 150 (45%)                              │
+│                                                                         │
+├─────────────────────────────────────────────────────────────────────────┤
+│  [▶ Play]  [⏸ Pausa]  [⏹ Stop]  [🔊]  [⚡×1.0]  [🌐 ES]  [🎨]        │
+└─────────────────────────────────────────────────────────────────────────┘
+
+FUNCIONAMIENTO:
+• Elimina el visor PDF completamente
+• Solo muestra texto extraído
+• TODO es seleccionable
+• Más rápido y consume menos recursos
+• Pierdes imágenes, diagramas, formato visual
+
+
+═══════════════════════════════════════════════════════════════════════════
+  OPCIÓN 4: OVERLAY (MÁS AVANZADA) ⭐⭐⭐
+═══════════════════════════════════════════════════════════════════════════
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ [<] Mi Libro.pdf                                      [★] [⚙]           │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│   ╔═════════════════════════════════════════════════════════════╗      │
+│   ║                                                             ║      │
+│   ║    Capítulo 1: Introducción                                ║      │
+│   ║    ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓ ← Texto invisible seleccionable ║      │
+│   ║                                   sobre el PDF              ║      │
+│   ║    Este es el contenido del PDF con su formato             ║      │
+│   ║    ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓        ║      │
+│   ║    ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓                             ║      │
+│   ║                                                             ║      │
+│   ║    [Imagen: Diagrama]                                      ║      │
+│   ║                                                             ║      │
+│   ║    Lorem ipsum dolor sit amet...                           ║      │
+│   ║    ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓                       ║      │
+│   ║                                                             ║      │
+│   ╚═════════════════════════════════════════════════════════════╝      │
+│                                                                         │
+│                        Página 3 de 150                                  │
+│                                                                         │
+│  💡 Toca directamente sobre el texto del PDF para empezar               │
+│                                                                         │
+├─────────────────────────────────────────────────────────────────────────┤
+│  [▶ Play]  [⏸ Pausa]  [⏹ Stop]  [🔊]  [⚡×1.0]  [🌐 ES]  [🎨]        │
+└─────────────────────────────────────────────────────────────────────────┘
+
+FUNCIONAMIENTO:
+• Texto invisible posicionado SOBRE el PDF renderizado
+• Cuando tocas el PDF, en realidad tocas el texto overlay
+• Se ve como si seleccionaras directamente en el PDF
+• MÁS COMPLEJO: requiere calcular posiciones exactas de cada palabra
+
+
+═══════════════════════════════════════════════════════════════════════════
+  COMPARACIÓN RÁPIDA
+═══════════════════════════════════════════════════════════════════════════
+
+┌────────────────┬────────────┬────────────┬──────────┬──────────────────┐
+│   OPCIÓN       │ FACILIDAD  │ VISUAL PDF │ SELECCIÓN│ RECOMENDACIÓN    │
+├────────────────┼────────────┼────────────┼──────────┼──────────────────┤
+│ 1. Dual View   │    ⭐⭐⭐  │     ✅     │    ✅    │ ⭐⭐⭐⭐⭐       │
+│                │            │   Arriba   │  Abajo   │ LA MEJOR         │
+├────────────────┼────────────┼────────────┼──────────┼──────────────────┤
+│ 2. Toggle      │   ⭐⭐⭐⭐  │     ✅     │    ✅    │ ⭐⭐⭐⭐         │
+│                │            │  Alterna   │ Alterna  │ MUY BUENA        │
+├────────────────┼────────────┼────────────┼──────────┼──────────────────┤
+│ 3. Solo Texto  │  ⭐⭐⭐⭐⭐  │     ❌     │    ✅    │ ⭐⭐             │
+│                │            │    No      │   Sí     │ SIMPLE PERO...   │
+├────────────────┼────────────┼────────────┼──────────┼──────────────────┤
+│ 4. Overlay     │     ⭐     │     ✅     │    ✅    │ ⭐⭐⭐           │
+│                │  Complejo  │    Sí      │   Sí     │ BONITA PERO HARD │
+└────────────────┴────────────┴────────────┴──────────┴──────────────────┘
+
+
+═══════════════════════════════════════════════════════════════════════════
+  MI RECOMENDACIÓN FINAL
+═══════════════════════════════════════════════════════════════════════════
+
+🥇 OPCIÓN 1 - DUAL VIEW es la MEJOR porque:
+
+  ✅ Ves el PDF completo (imágenes, tablas, formato)
+  ✅ Tienes texto totalmente seleccionable
+  ✅ Fácil de usar: toca donde quieres empezar
+  ✅ Implementación media (2-3 horas)
+  ✅ Experiencia de usuario óptima
+
+🥈 OPCIÓN 2 - TOGGLE si prefieres:
+
+  ✅ Pantalla completa para PDF o Texto
+  ✅ Más espacio para cada vista
+  ✅ Más simple de implementar (1-2 horas)
+  ✅ Cambias según necesites
+
+═══════════════════════════════════════════════════════════════════════════
+
+¿Cuál quieres que implemente? Escribe:
+  1 → Dual View (PDF arriba + Texto abajo)
+  2 → Toggle (Botón para cambiar entre PDF y Texto)
+  3 → Solo Texto (Eliminar visor PDF)
+  4 → Overlay (Texto sobre PDF - más complejo)
+
+O si tienes una idea diferente, ¡dime!
