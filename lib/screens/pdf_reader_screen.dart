@@ -58,6 +58,12 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
       _currentPageText = text;
       _textEditingController.text = text;
       _isLoadingText = false;
+      // Resetear el índice del cursor al inicio de la nueva página
+      _currentCharIndex = 0;
+      // Colocar el cursor al inicio
+      _textEditingController.selection = TextSelection.fromPosition(
+        const TextPosition(offset: 0),
+      );
     });
   }
 
@@ -84,19 +90,33 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
       _currentCharIndex = cursorPosition;
     }
     
-    // Calcular velocidad aproximada de lectura
-    // Velocidad normal: ~150 palabras/min = ~2.5 palabras/seg = ~12.5 caracteres/seg
+    // Calcular velocidad aproximada de lectura basada en la velocidad del TTS
+    // Ajustamos la fórmula para que sea más realista
     final speed = provider.ttsService.speechRate;
-    final charsPerSecond = (12.5 * speed).round();
+    // A velocidad 0.5 (~100 palabras/min) = ~8 caracteres/seg
+    // A velocidad 1.0 (~200 palabras/min) = ~16 caracteres/seg
+    final charsPerSecond = (16.0 * speed);
     final millisPerChar = (1000 / charsPerSecond).round();
     
     _cursorTimer = Timer.periodic(Duration(milliseconds: millisPerChar), (timer) {
-      if (_currentCharIndex < _currentPageText.length && mounted) {
+      if (_currentCharIndex < _currentPageText.length && mounted && provider.isPlaying) {
         setState(() {
           _currentCharIndex++;
           _textEditingController.selection = TextSelection.fromPosition(
             TextPosition(offset: _currentCharIndex),
           );
+          
+          // Auto-scroll para seguir el cursor
+          if (_textScrollController.hasClients) {
+            final lineHeight = 16 * 1.6; // fontSize * height
+            final scrollPosition = (_currentCharIndex / _currentPageText.length) * 
+                                   (_currentPageText.length * lineHeight / 50);
+            _textScrollController.animateTo(
+              scrollPosition,
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeOut,
+            );
+          }
         });
       } else {
         _stopCursorAnimation();
@@ -139,10 +159,14 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
 
   void _handleStop() {
     final provider = Provider.of<AppProvider>(context, listen: false);
-    provider.stop();
     _stopCursorAnimation();
+    provider.stop();
     
     // El cursor queda donde estaba (no se resetea)
+    // Asegurarnos de que el estado se actualice
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   void _handlePause() {
@@ -464,26 +488,33 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
                       child: Scrollbar(
                         controller: _textScrollController,
                         thumbVisibility: true,
-                        child: SingleChildScrollView(
-                          controller: _textScrollController,
-                          padding: const EdgeInsets.all(16),
-                          child: TextField(
-                            controller: _textEditingController,
-                            focusNode: _textFocusNode,
-                            maxLines: null,
-                            readOnly: false,
-                            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                              height: 1.6,
-                              fontSize: 16,
+                        child: GestureDetector(
+                          onTapDown: (details) {
+                            // Solicitar foco sin mostrar teclado
+                            _textFocusNode.requestFocus();
+                          },
+                          child: SingleChildScrollView(
+                            controller: _textScrollController,
+                            padding: const EdgeInsets.all(16),
+                            child: TextField(
+                              controller: _textEditingController,
+                              focusNode: _textFocusNode,
+                              maxLines: null,
+                              readOnly: false,
+                              showCursor: true,
+                              enableInteractiveSelection: true,
+                              cursorColor: Theme.of(context).colorScheme.primary,
+                              cursorWidth: 2.0,
+                              cursorHeight: 24.0,
+                              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                height: 1.6,
+                                fontSize: 16,
+                              ),
+                              decoration: const InputDecoration(
+                                border: InputBorder.none,
+                                hintText: 'Coloca el cursor donde quieras empezar...',
+                              ),
                             ),
-                            decoration: const InputDecoration(
-                              border: InputBorder.none,
-                              hintText: 'Coloca el cursor donde quieras empezar...',
-                            ),
-                            onTap: () {
-                              // El usuario toca para posicionar el cursor
-                              // No hacemos nada especial aquí, el cursor se posiciona automáticamente
-                            },
                           ),
                         ),
                       ),
