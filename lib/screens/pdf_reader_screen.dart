@@ -297,7 +297,7 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
       ),
     );
 
-    if (result != null && result.isNotEmpty) {
+    if (result != null && result.isNotEmpty && mounted) {
       final provider = Provider.of<AppProvider>(context, listen: false);
       await provider.addBookmark(widget.book.id, _currentPage - 1, result);
       
@@ -394,22 +394,15 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
           onPageChanged: _onPageChanged,
         ),
         
-        // Capa 2: Área de selección - solo captura doble tap
+        // Capa 2: Captura SOLO doble tap, permite scroll/zoom del PDF
         if (_currentPageText.isNotEmpty)
           Positioned.fill(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                return GestureDetector(
-                  behavior: HitTestBehavior.deferToChild, // Permite pasar eventos al PDF
-                  onDoubleTap: () {
-                    // Mostrar diálogo para seleccionar posición
-                    _showPositionSelector();
-                  },
-                  child: Container(
-                    color: Colors.transparent,
-                  ),
-                );
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent, // Permite pasar gestos de scroll
+              onDoubleTap: () {
+                _showPositionSelector();
               },
+              // Importante: NO usar child Container para no bloquear eventos
             ),
           ),
         
