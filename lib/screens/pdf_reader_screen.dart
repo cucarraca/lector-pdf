@@ -98,6 +98,82 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
     );
   }
 
+  void _showPositionSelector() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Seleccionar posición'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.skip_previous),
+              title: const Text('Inicio (0%)'),
+              onTap: () {
+                setState(() {
+                  _selectedStartIndex = 0;
+                  _currentCharIndex = 0;
+                });
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Leer desde el inicio')),
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.play_arrow),
+              title: const Text('25%'),
+              onTap: () {
+                setState(() {
+                  _selectedStartIndex = (_currentPageText.length * 0.25).toInt();
+                  _currentCharIndex = _selectedStartIndex;
+                });
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Leer desde 25%')),
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.play_arrow),
+              title: const Text('Medio (50%)'),
+              onTap: () {
+                setState(() {
+                  _selectedStartIndex = (_currentPageText.length * 0.5).toInt();
+                  _currentCharIndex = _selectedStartIndex;
+                });
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Leer desde la mitad')),
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.play_arrow),
+              title: const Text('75%'),
+              onTap: () {
+                setState(() {
+                  _selectedStartIndex = (_currentPageText.length * 0.75).toInt();
+                  _currentCharIndex = _selectedStartIndex;
+                });
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Leer desde 75%')),
+                );
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _startCursorAnimation() {
     _stopCursorAnimation();
     
@@ -318,16 +394,19 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
           onPageChanged: _onPageChanged,
         ),
         
-        // Capa 2: Overlay invisible para detectar toques
+        // Capa 2: Área de selección - solo captura doble tap
         if (_currentPageText.isNotEmpty)
           Positioned.fill(
             child: LayoutBuilder(
               builder: (context, constraints) {
                 return GestureDetector(
-                  onTapDown: (details) => _onTextTap(details, constraints),
+                  behavior: HitTestBehavior.deferToChild, // Permite pasar eventos al PDF
+                  onDoubleTap: () {
+                    // Mostrar diálogo para seleccionar posición
+                    _showPositionSelector();
+                  },
                   child: Container(
-                    color: Colors.transparent, // Completamente transparente
-                    // Para debug: Colors.black.withOpacity(0.1),
+                    color: Colors.transparent,
                   ),
                 );
               },
@@ -397,7 +476,7 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
                   ),
                   SizedBox(width: 8),
                   Text(
-                    'Toca sobre el PDF para seleccionar desde dónde leer',
+                    'Doble tap para seleccionar desde dónde leer',
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 12,
