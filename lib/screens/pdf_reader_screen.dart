@@ -27,10 +27,9 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
   final ScrollController _textScrollController = ScrollController();
   
   int _currentPage = 1;
-  String _fullPdfText = ''; // Texto completo del PDF
+  String _currentPageText = '';
   bool _isLoadingText = false;
   ViewMode _viewMode = ViewMode.pdf;
-  double _loadingProgress = 0.0; // Progreso de carga 0.0 a 1.0
   
   // Para el cursor animado
   Timer? _cursorTimer;
@@ -41,68 +40,31 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
     super.initState();
     _pdfViewerController.jumpToPage(widget.book.currentPage + 1);
     _currentPage = widget.book.currentPage + 1;
-    _loadAllPdfText(); // Cargar TODO el texto del PDF
+    _loadCurrentPageText();
   }
 
-  Future<void> _loadAllPdfText() async {
+  Future<void> _loadCurrentPageText() async {
     if (_isLoadingText) return;
     
-    setState(() {
-      _isLoadingText = true;
-      _loadingProgress = 0.0;
-    });
+    setState(() => _isLoadingText = true);
     
     final provider = Provider.of<AppProvider>(context, listen: false);
+    final text = await provider.pdfService.extractTextFromPage(
+      widget.book.filePath,
+      _currentPage - 1,
+    );
     
-    try {
-      // Obtener total de páginas
-      final totalPages = widget.book.totalPages;
-      final StringBuffer fullText = StringBuffer();
-      
-      // Cargar página por página con progreso
-      for (int i = 0; i < totalPages; i++) {
-        final pageText = await provider.pdfService.extractTextFromPage(
-          widget.book.filePath,
-          i,
-        );
-        
-        fullText.write(pageText);
-        if (i < totalPages - 1) {
-          fullText.write('\n\n--- Página ${i + 2} ---\n\n'); // Separador entre páginas
-        }
-        
-        // Actualizar progreso
-        if (mounted) {
-          setState(() {
-            _loadingProgress = (i + 1) / totalPages;
-          });
-        }
-      }
-      
-      if (mounted) {
-        setState(() {
-          _fullPdfText = fullText.toString();
-          _textEditingController.text = _fullPdfText;
-          _isLoadingText = false;
-          _loadingProgress = 1.0;
-          // Colocar el cursor al inicio
-          _currentCharIndex = 0;
-          _textEditingController.selection = TextSelection.fromPosition(
-            const TextPosition(offset: 0),
-          );
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isLoadingText = false;
-          _loadingProgress = 0.0;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al cargar el texto: $e')),
-        );
-      }
-    }
+    setState(() {
+      _currentPageText = text;
+      _textEditingController.text = text;
+      _isLoadingText = false;
+      // Resetear el índice del cursor al inicio de la nueva página
+      _currentCharIndex = 0;
+      // Colocar el cursor al inicio
+      _textEditingController.selection = TextSelection.fromPosition(
+        const TextPosition(offset: 0),
+      );
+    });
   }
 
   void _onPageChanged(PdfPageChangedDetails details) {
@@ -113,7 +75,7 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
     final provider = Provider.of<AppProvider>(context, listen: false);
     provider.updateProgress(widget.book.id, _currentPage - 1, widget.book.totalPages);
     
-    // Ya NO recargamos el texto porque tenemos todo el PDF cargado
+    _loadCurrentPageText();
   }
 
   void _startCursorAnimation() {
@@ -122,18 +84,14 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
     final provider = Provider.of<AppProvider>(context, listen: false);
     final cursorPosition = _textEditingController.selection.baseOffset;
     
-    if (cursorPosition < 0 || cursorPosition >= _fullPdfText.length) {
+    if (cursorPosition < 0 || cursorPosition >= _currentPageText.length) {
       _currentCharIndex = 0;
     } else {
       _currentCharIndex = cursorPosition;
     }
     
-    // Asegurar que el TextField mantenga el foco y el cursor sea visible
-    if (!_textFocusNode.hasFocus) {
-      _textFocusNode.requestFocus();
-    }
-    
     // Calcular velocidad aproximada de lectura basada en la velocidad del TTS
+    // Ajustamos la fórmula para que sea más realista
     final speed = provider.ttsService.speechRate;
     // A velocidad 0.5 (~100 palabras/min) = ~8 caracteres/seg
     // A velocidad 1.0 (~200 palabras/min) = ~16 caracteres/seg
@@ -141,15 +99,7 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
     final millisPerChar = (1000 / charsPerSecond).round();
     
     _cursorTimer = Timer.periodic(Duration(milliseconds: millisPerChar), (timer) {
-      if (_currentCharIndex < _fullPdfText.length && mounted) {
-        // Verificar si todavía estamos reproduciendo
-        final isStillPlaying = Provider.of<AppProvider>(context, listen: false).isPlaying;
-        
-        if (!isStillPlaying) {
-          _stopCursorAnimation();
-          return;
-        }
-        
+      if (_currentCharIndex < _currentPageText.length && mounted && provider.isPlaying) {
         setState(() {
           _currentCharIndex++;
           _textEditingController.selection = TextSelection.fromPosition(
@@ -159,8 +109,8 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
           // Auto-scroll para seguir el cursor
           if (_textScrollController.hasClients) {
             final lineHeight = 16 * 1.6; // fontSize * height
-            final scrollPosition = (_currentCharIndex / _fullPdfText.length) * 
-                                   (_fullPdfText.length * lineHeight / 50);
+            final scrollPosition = (_currentCharIndex / _currentPageText.length) * 
+                                   (_currentPageText.length * lineHeight / 50);
             _textScrollController.animateTo(
               scrollPosition,
               duration: const Duration(milliseconds: 200),
@@ -180,9 +130,9 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
   }
 
   Future<void> _readCurrentPage() async {
-    if (_fullPdfText.isEmpty) {
+    if (_currentPageText.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No hay texto para leer. Espera a que termine de cargar.')),
+        const SnackBar(content: Text('No hay texto para leer en esta página')),
       );
       return;
     }
@@ -191,12 +141,12 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
     
     // Obtener posición del cursor
     final cursorPosition = _textEditingController.selection.baseOffset;
-    final startIndex = cursorPosition >= 0 && cursorPosition < _fullPdfText.length 
+    final startIndex = cursorPosition >= 0 && cursorPosition < _currentPageText.length 
         ? cursorPosition 
         : 0;
     
     // Leer desde la posición del cursor
-    final textToRead = _fullPdfText.substring(startIndex);
+    final textToRead = _currentPageText.substring(startIndex);
     
     // Iniciar animación del cursor
     _startCursorAnimation();
@@ -226,24 +176,15 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
   }
 
   Future<void> _translateAndRead() async {
-    if (_fullPdfText.isEmpty) {
+    if (_currentPageText.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No hay texto para traducir. Espera a que termine de cargar.')),
+        const SnackBar(content: Text('No hay texto para traducir en esta página')),
       );
       return;
     }
 
     final provider = Provider.of<AppProvider>(context, listen: false);
-    
-    // Obtener posición del cursor
-    final cursorPosition = _textEditingController.selection.baseOffset;
-    final startIndex = cursorPosition >= 0 && cursorPosition < _fullPdfText.length 
-        ? cursorPosition 
-        : 0;
-    
-    // Traducir y leer desde la posición del cursor
-    final textToTranslate = _fullPdfText.substring(startIndex);
-    await provider.translateAndSpeak(textToTranslate);
+    await provider.translateAndSpeak(_currentPageText);
   }
 
   Future<void> _addBookmark() async {
@@ -483,38 +424,8 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
     return Container(
       color: Theme.of(context).cardColor,
       child: _isLoadingText
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const CircularProgressIndicator(),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Cargando texto del PDF...',
-                    style: Theme.of(context).textTheme.bodyLarge,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '${(_loadingProgress * 100).toStringAsFixed(0)}%',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    width: 200,
-                    child: LinearProgressIndicator(
-                      value: _loadingProgress,
-                      backgroundColor: Colors.grey[300],
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        Theme.of(context).primaryColor,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            )
-          : _fullPdfText.isEmpty
+          ? const Center(child: CircularProgressIndicator())
+          : _currentPageText.isEmpty
               ? Center(
                   child: Padding(
                     padding: const EdgeInsets.all(20),
@@ -532,7 +443,7 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
                         ),
                         const SizedBox(height: 16),
                         Text(
-                          'No se pudo extraer texto del PDF',
+                          'No se pudo extraer texto de esta página',
                           style: Theme.of(context).textTheme.bodyLarge,
                           textAlign: TextAlign.center,
                         ),
@@ -561,12 +472,12 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
                           const Icon(Icons.text_snippet, size: 20),
                           const SizedBox(width: 8),
                           Text(
-                            'Texto Completo del PDF',
+                            'Página $_currentPage',
                             style: Theme.of(context).textTheme.titleMedium,
                           ),
                           const Spacer(),
                           Text(
-                            '${_fullPdfText.length} caracteres',
+                            '${_currentPageText.length} caracteres',
                             style: Theme.of(context).textTheme.bodySmall,
                           ),
                         ],
