@@ -8,8 +8,6 @@ import '../providers/app_provider.dart';
 import '../widgets/reader_controls.dart';
 import '../widgets/bookmarks_drawer.dart';
 
-enum ViewMode { pdf, text }
-
 class PdfReaderScreen extends StatefulWidget {
   final PdfBook book;
 
@@ -22,14 +20,13 @@ class PdfReaderScreen extends StatefulWidget {
 class _PdfReaderScreenState extends State<PdfReaderScreen> {
   final PdfViewerController _pdfViewerController = PdfViewerController();
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-  final TextEditingController _textEditingController = TextEditingController();
-  final FocusNode _textFocusNode = FocusNode();
-  final ScrollController _textScrollController = ScrollController();
   
   int _currentPage = 1;
   String _currentPageText = '';
   bool _isLoadingText = false;
-  ViewMode _viewMode = ViewMode.pdf;
+  
+  // Para la selección de texto en el overlay
+  int _selectedStartIndex = 0;
   
   // Para el cursor animado
   Timer? _cursorTimer;
@@ -54,17 +51,14 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
       _currentPage - 1,
     );
     
-    setState(() {
-      _currentPageText = text;
-      _textEditingController.text = text;
-      _isLoadingText = false;
-      // Resetear el índice del cursor al inicio de la nueva página
-      _currentCharIndex = 0;
-      // Colocar el cursor al inicio
-      _textEditingController.selection = TextSelection.fromPosition(
-        const TextPosition(offset: 0),
-      );
-    });
+    if (mounted) {
+      setState(() {
+        _currentPageText = text;
+        _isLoadingText = false;
+        _currentCharIndex = 0;
+        _selectedStartIndex = 0;
+      });
+    }
   }
 
   void _onPageChanged(PdfPageChangedDetails details) {
@@ -78,45 +72,60 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
     _loadCurrentPageText();
   }
 
+  void _onTextTap(TapDownDetails details, BoxConstraints constraints) {
+    if (_currentPageText.isEmpty) return;
+    
+    // Calcular posición aproximada en el texto basándose en dónde se tocó
+    final tapY = details.localPosition.dy;
+    final totalHeight = constraints.maxHeight;
+    
+    // Estimación simple: posición vertical determina qué parte del texto
+    final relativePosition = tapY / totalHeight;
+    final estimatedIndex = (relativePosition * _currentPageText.length).clamp(0, _currentPageText.length - 1).toInt();
+    
+    setState(() {
+      _selectedStartIndex = estimatedIndex;
+      _currentCharIndex = estimatedIndex;
+    });
+    
+    // Mostrar feedback visual
+    ScaffoldMessenger.of(context).clearSnackBars();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Leer desde posición ${(relativePosition * 100).toInt()}%'),
+        duration: const Duration(seconds: 1),
+      ),
+    );
+  }
+
   void _startCursorAnimation() {
     _stopCursorAnimation();
     
     final provider = Provider.of<AppProvider>(context, listen: false);
-    final cursorPosition = _textEditingController.selection.baseOffset;
     
-    if (cursorPosition < 0 || cursorPosition >= _currentPageText.length) {
-      _currentCharIndex = 0;
+    // Usar el índice seleccionado
+    if (_selectedStartIndex >= 0 && _selectedStartIndex < _currentPageText.length) {
+      _currentCharIndex = _selectedStartIndex;
     } else {
-      _currentCharIndex = cursorPosition;
+      _currentCharIndex = 0;
     }
     
-    // Calcular velocidad aproximada de lectura basada en la velocidad del TTS
-    // Ajustamos la fórmula para que sea más realista
+    // Calcular velocidad basada en TTS
     final speed = provider.ttsService.speechRate;
-    // A velocidad 0.5 (~100 palabras/min) = ~8 caracteres/seg
-    // A velocidad 1.0 (~200 palabras/min) = ~16 caracteres/seg
     final charsPerSecond = (16.0 * speed);
     final millisPerChar = (1000 / charsPerSecond).round();
     
     _cursorTimer = Timer.periodic(Duration(milliseconds: millisPerChar), (timer) {
-      if (_currentCharIndex < _currentPageText.length && mounted && provider.isPlaying) {
+      if (_currentCharIndex < _currentPageText.length && mounted) {
+        final isStillPlaying = Provider.of<AppProvider>(context, listen: false).isPlaying;
+        
+        if (!isStillPlaying) {
+          _stopCursorAnimation();
+          return;
+        }
+        
         setState(() {
           _currentCharIndex++;
-          _textEditingController.selection = TextSelection.fromPosition(
-            TextPosition(offset: _currentCharIndex),
-          );
-          
-          // Auto-scroll para seguir el cursor
-          if (_textScrollController.hasClients) {
-            final lineHeight = 16 * 1.6; // fontSize * height
-            final scrollPosition = (_currentCharIndex / _currentPageText.length) * 
-                                   (_currentPageText.length * lineHeight / 50);
-            _textScrollController.animateTo(
-              scrollPosition,
-              duration: const Duration(milliseconds: 200),
-              curve: Curves.easeOut,
-            );
-          }
         });
       } else {
         _stopCursorAnimation();
@@ -139,13 +148,8 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
 
     final provider = Provider.of<AppProvider>(context, listen: false);
     
-    // Obtener posición del cursor
-    final cursorPosition = _textEditingController.selection.baseOffset;
-    final startIndex = cursorPosition >= 0 && cursorPosition < _currentPageText.length 
-        ? cursorPosition 
-        : 0;
-    
-    // Leer desde la posición del cursor
+    // Leer desde la posición seleccionada
+    final startIndex = _selectedStartIndex.clamp(0, _currentPageText.length);
     final textToRead = _currentPageText.substring(startIndex);
     
     // Iniciar animación del cursor
@@ -184,7 +188,9 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
     }
 
     final provider = Provider.of<AppProvider>(context, listen: false);
-    await provider.translateAndSpeak(_currentPageText);
+    final startIndex = _selectedStartIndex.clamp(0, _currentPageText.length);
+    final textToTranslate = _currentPageText.substring(startIndex);
+    await provider.translateAndSpeak(textToTranslate);
   }
 
   Future<void> _addBookmark() async {
@@ -262,39 +268,6 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
       appBar: AppBar(
         title: Text(widget.book.title),
         actions: [
-          // Botones de cambio de modo
-          SegmentedButton<ViewMode>(
-            segments: const [
-              ButtonSegment<ViewMode>(
-                value: ViewMode.pdf,
-                label: Text('PDF'),
-                icon: Icon(Icons.picture_as_pdf, size: 18),
-              ),
-              ButtonSegment<ViewMode>(
-                value: ViewMode.text,
-                label: Text('Texto'),
-                icon: Icon(Icons.text_fields, size: 18),
-              ),
-            ],
-            selected: {_viewMode},
-            onSelectionChanged: (Set<ViewMode> newSelection) {
-              setState(() {
-                _viewMode = newSelection.first;
-                if (_viewMode == ViewMode.text) {
-                  // Dar foco al texto cuando cambiamos a modo texto
-                  Future.delayed(const Duration(milliseconds: 100), () {
-                    _textFocusNode.requestFocus();
-                  });
-                }
-              });
-            },
-            style: ButtonStyle(
-              padding: MaterialStateProperty.all(
-                const EdgeInsets.symmetric(horizontal: 8),
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
           IconButton(
             icon: const Icon(Icons.bookmark),
             onPressed: () {
@@ -313,9 +286,9 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
       ),
       body: Column(
         children: [
-          // Contenido principal según el modo seleccionado
+          // Contenido principal: PDF con overlay de texto
           Expanded(
-            child: _viewMode == ViewMode.pdf ? _buildPdfView() : _buildTextView(),
+            child: _buildPdfWithOverlay(),
           ),
           // Controles de reproducción
           ReaderControls(
@@ -335,14 +308,32 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
     );
   }
 
-  Widget _buildPdfView() {
+  Widget _buildPdfWithOverlay() {
     return Stack(
       children: [
+        // Capa 1: El visor PDF
         SfPdfViewer.file(
           File(widget.book.filePath),
           controller: _pdfViewerController,
           onPageChanged: _onPageChanged,
         ),
+        
+        // Capa 2: Overlay invisible para detectar toques
+        if (_currentPageText.isNotEmpty)
+          Positioned.fill(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                return GestureDetector(
+                  onTapDown: (details) => _onTextTap(details, constraints),
+                  child: Container(
+                    color: Colors.transparent, // Completamente transparente
+                    // Para debug: Colors.black.withOpacity(0.1),
+                  ),
+                );
+              },
+            ),
+          ),
+        
         // Indicador de página
         Positioned(
           bottom: 16,
@@ -380,7 +371,8 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
             ),
           ),
         ),
-        // Hint para cambiar a modo texto
+        
+        // Hint para el usuario
         Positioned(
           top: 16,
           left: 0,
@@ -399,13 +391,13 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
-                    Icons.info_outline,
+                    Icons.touch_app,
                     color: Colors.white,
                     size: 16,
                   ),
                   SizedBox(width: 8),
                   Text(
-                    'Toca "Texto" arriba para seleccionar desde dónde leer',
+                    'Toca sobre el PDF para seleccionar desde dónde leer',
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 12,
@@ -416,143 +408,19 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
             ),
           ),
         ),
+        
+        // Indicador de carga
+        if (_isLoadingText)
+          const Center(
+            child: CircularProgressIndicator(),
+          ),
       ],
-    );
-  }
-
-  Widget _buildTextView() {
-    return Container(
-      color: Theme.of(context).cardColor,
-      child: _isLoadingText
-          ? const Center(child: CircularProgressIndicator())
-          : _currentPageText.isEmpty
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.text_fields,
-                          size: 48,
-                          color: Theme.of(context)
-                              .textTheme
-                              .bodyLarge
-                              ?.color
-                              ?.withOpacity(0.5),
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'No se pudo extraer texto de esta página',
-                          style: Theme.of(context).textTheme.bodyLarge,
-                          textAlign: TextAlign.center,
-                        ),
-                      ],
-                    ),
-                  ),
-                )
-              : Column(
-                  children: [
-                    // Header
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).primaryColor.withOpacity(0.1),
-                        border: Border(
-                          bottom: BorderSide(
-                            color: Theme.of(context).dividerColor,
-                          ),
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.text_snippet, size: 20),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Página $_currentPage',
-                            style: Theme.of(context).textTheme.titleMedium,
-                          ),
-                          const Spacer(),
-                          Text(
-                            '${_currentPageText.length} caracteres',
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                        ],
-                      ),
-                    ),
-                    // Campo de texto con cursor
-                    Expanded(
-                      child: Scrollbar(
-                        controller: _textScrollController,
-                        thumbVisibility: true,
-                        child: GestureDetector(
-                          onTapDown: (details) {
-                            // Solicitar foco sin mostrar teclado
-                            _textFocusNode.requestFocus();
-                          },
-                          child: SingleChildScrollView(
-                            controller: _textScrollController,
-                            padding: const EdgeInsets.all(16),
-                            child: TextField(
-                              controller: _textEditingController,
-                              focusNode: _textFocusNode,
-                              maxLines: null,
-                              readOnly: false,
-                              showCursor: true,
-                              enableInteractiveSelection: true,
-                              cursorColor: Theme.of(context).colorScheme.primary,
-                              cursorWidth: 2.0,
-                              cursorHeight: 24.0,
-                              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                height: 1.6,
-                                fontSize: 16,
-                              ),
-                              decoration: const InputDecoration(
-                                border: InputBorder.none,
-                                hintText: 'Coloca el cursor donde quieras empezar...',
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    // Footer con hint
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).primaryColor.withOpacity(0.1),
-                        border: Border(
-                          top: BorderSide(
-                            color: Theme.of(context).dividerColor,
-                          ),
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.touch_app, size: 16),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Toca el texto para colocar el cursor y presiona Play',
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
     );
   }
 
   @override
   void dispose() {
     _pdfViewerController.dispose();
-    _textEditingController.dispose();
-    _textFocusNode.dispose();
-    _textScrollController.dispose();
     _stopCursorAnimation();
     super.dispose();
   }
