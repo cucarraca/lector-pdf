@@ -108,6 +108,16 @@ class AppProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> resume() async {
+    await _ttsService.resume();
+    _isPlaying = true;
+    notifyListeners();
+  }
+  
+  void setPausedText(String text, int position) {
+    _ttsService.setPausedText(text, position);
+  }
+
   Future<void> stop() async {
     await _ttsService.stop();
     _isPlaying = false;

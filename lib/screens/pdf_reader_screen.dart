@@ -24,6 +24,7 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
   int _currentPage = 1;
   String _currentPageText = '';
   bool _isLoadingText = false;
+  bool _isPaused = false;
   
   // Para la selección de texto en el overlay
   int _selectedStartIndex = 0;
@@ -249,15 +250,21 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
   Future<void> _goToNextPageAndContinueReading() async {
     if (_currentPage >= widget.book.totalPages) return;
     
-    // Avanzar página
+    // Avanzar página con scroll automático
     _pdfViewerController.jumpToPage(_currentPage + 1);
     
-    // Esperar a que se cargue la nueva página
+    // Esperar a que se actualice la página
+    await Future.delayed(const Duration(milliseconds: 800));
+    
+    // La página se actualizó a través de onPageChanged que llama a _loadCurrentPageText
+    // Esperar un poco más para que cargue el texto
     await Future.delayed(const Duration(milliseconds: 500));
     
-    // Resetear posición de lectura al inicio
-    _selectedStartIndex = 0;
-    _currentCharIndex = 0;
+    // Resetear posición de lectura al inicio de la nueva página
+    setState(() {
+      _selectedStartIndex = 0;
+      _currentCharIndex = 0;
+    });
     
     // Continuar leyendo si todavía está en modo reproducción
     if (mounted) {
@@ -273,17 +280,46 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
     _stopCursorAnimation();
     provider.stop();
     
-    // El cursor queda donde estaba (no se resetea)
-    // Asegurarnos de que el estado se actualice
-    if (mounted) {
-      setState(() {});
-    }
+    setState(() {
+      _isPaused = false;
+    });
   }
 
   void _handlePause() {
     final provider = Provider.of<AppProvider>(context, listen: false);
-    provider.pause();
     _stopCursorAnimation();
+    
+    // Guardar posición exacta para resume
+    provider.setPausedText(_currentPageText, _currentCharIndex);
+    provider.pause();
+    
+    setState(() {
+      _isPaused = true;
+    });
+  }
+  
+  Future<void> _handlePlayOrResume() async {
+    if (_isPaused) {
+      // Reanudar desde donde se pausó
+      await _handleResume();
+    } else {
+      // Iniciar lectura normal
+      await _readCurrentPage();
+    }
+  }
+  
+  Future<void> _handleResume() async {
+    final provider = Provider.of<AppProvider>(context, listen: false);
+    
+    setState(() {
+      _isPaused = false;
+    });
+    
+    // Continuar desde la posición guardada
+    await provider.resume();
+    
+    // Reanudar animación del cursor
+    _startCursorAnimation();
   }
 
   Future<void> _translateAndRead() async {
@@ -401,7 +437,7 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
           ReaderControls(
             isPlaying: context.watch<AppProvider>().isPlaying,
             isTranslating: context.watch<AppProvider>().isTranslating,
-            onPlay: _readCurrentPage,
+            onPlay: _handlePlayOrResume,
             onPause: _handlePause,
             onStop: _handleStop,
             onTranslate: _translateAndRead,

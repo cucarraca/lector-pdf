@@ -3,10 +3,13 @@ import 'package:flutter_tts/flutter_tts.dart';
 class TtsService {
   final FlutterTts _flutterTts = FlutterTts();
   bool _isPlaying = false;
+  bool _isPaused = false;
   double _speechRate = 0.5;
   double _pitch = 1.0;
   String _currentVoice = '';
   List<dynamic> _availableVoices = [];
+  String _pausedText = '';
+  int _pausedPosition = 0;
 
   TtsService() {
     _initTts();
@@ -31,35 +34,54 @@ class TtsService {
 
     _flutterTts.setStartHandler(() {
       _isPlaying = true;
+      _isPaused = false;
     });
 
     _flutterTts.setCompletionHandler(() {
       _isPlaying = false;
+      _isPaused = false;
     });
 
     _flutterTts.setErrorHandler((msg) {
       _isPlaying = false;
+      _isPaused = false;
     });
   }
 
   Future<void> speak(String text) async {
     if (text.isEmpty) return;
+    _pausedText = text;
+    _pausedPosition = 0;
+    _isPaused = false;
     await _flutterTts.speak(text);
     _isPlaying = true;
   }
 
   Future<void> pause() async {
-    await _flutterTts.pause();
+    await _flutterTts.stop();
+    _isPaused = true;
     _isPlaying = false;
   }
 
   Future<void> resume() async {
-    _isPlaying = true;
+    if (_isPaused && _pausedText.isNotEmpty) {
+      _isPaused = false;
+      await _flutterTts.speak(_pausedText.substring(_pausedPosition));
+      _isPlaying = true;
+    }
+  }
+
+  void setPausedText(String text, int position) {
+    _pausedText = text;
+    _pausedPosition = position;
   }
 
   Future<void> stop() async {
     await _flutterTts.stop();
     _isPlaying = false;
+    _isPaused = false;
+    _pausedText = '';
+    _pausedPosition = 0;
   }
 
   Future<void> setRate(double rate) async {
@@ -99,6 +121,7 @@ class TtsService {
   }
 
   bool get isPlaying => _isPlaying;
+  bool get isPaused => _isPaused;
   double get speechRate => _speechRate;
   double get pitch => _pitch;
   String get currentVoice => _currentVoice;
