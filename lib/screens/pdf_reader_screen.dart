@@ -235,6 +235,37 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
     
     // Detener animación cuando termine
     _stopCursorAnimation();
+    
+    // Si terminó de leer la página completa y hay más páginas, continuar con la siguiente
+    if (startIndex == 0 && _currentPage < widget.book.totalPages && mounted) {
+      final isStillPlaying = Provider.of<AppProvider>(context, listen: false).isPlaying;
+      if (isStillPlaying) {
+        // Avanzar a la siguiente página
+        await _goToNextPageAndContinueReading();
+      }
+    }
+  }
+  
+  Future<void> _goToNextPageAndContinueReading() async {
+    if (_currentPage >= widget.book.totalPages) return;
+    
+    // Avanzar página
+    _pdfViewerController.jumpToPage(_currentPage + 1);
+    
+    // Esperar a que se cargue la nueva página
+    await Future.delayed(const Duration(milliseconds: 500));
+    
+    // Resetear posición de lectura al inicio
+    _selectedStartIndex = 0;
+    _currentCharIndex = 0;
+    
+    // Continuar leyendo si todavía está en modo reproducción
+    if (mounted) {
+      final provider = Provider.of<AppProvider>(context, listen: false);
+      if (provider.isPlaying && _currentPageText.isNotEmpty) {
+        await _readCurrentPage();
+      }
+    }
   }
 
   void _handleStop() {

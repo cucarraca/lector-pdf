@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import '../models/pdf_book.dart';
 import '../providers/app_provider.dart';
 
-class BookmarksDrawer extends StatelessWidget {
+class BookmarksDrawer extends StatefulWidget {
   final PdfBook book;
   final Function(int) onBookmarkTap;
 
@@ -14,63 +14,79 @@ class BookmarksDrawer extends StatelessWidget {
   });
 
   @override
+  State<BookmarksDrawer> createState() => _BookmarksDrawerState();
+}
+
+class _BookmarksDrawerState extends State<BookmarksDrawer> {
+  @override
   Widget build(BuildContext context) {
-    return Drawer(
-      child: Column(
-        children: [
-          DrawerHeader(
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.primary,
-            ),
-            child: const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                Icon(Icons.bookmarks, color: Colors.white, size: 40),
-                SizedBox(height: 10),
-                Text(
-                  'Marcadores',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
+    // Usar Consumer para escuchar cambios en el provider
+    return Consumer<AppProvider>(
+      builder: (context, provider, child) {
+        // Obtener libro actualizado del provider
+        final updatedBook = provider.books.firstWhere(
+          (b) => b.id == widget.book.id,
+          orElse: () => widget.book,
+        );
+        
+        return Drawer(
+          child: Column(
+            children: [
+              DrawerHeader(
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primary,
                 ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: book.bookmarks.isEmpty
-                ? const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(20.0),
-                      child: Text(
-                        'No hay marcadores.\nToca el botón + en el lector para añadir uno.',
-                        textAlign: TextAlign.center,
+                child: const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    Icon(Icons.bookmarks, color: Colors.white, size: 40),
+                    SizedBox(height: 10),
+                    Text(
+                      'Marcadores',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
-                  )
-                : ListView.builder(
-                    itemCount: book.bookmarks.length,
-                    itemBuilder: (context, index) {
-                      final bookmark = book.bookmarks[index];
-                      return ListTile(
-                        leading: const Icon(Icons.bookmark),
-                        title: Text(bookmark.title),
-                        subtitle: Text('Página ${bookmark.pageNumber + 1}'),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.delete),
-                          onPressed: () {
-                            _confirmDelete(context, bookmark.id);
-                          },
+                  ],
+                ),
+              ),
+              Expanded(
+                child: updatedBook.bookmarks.isEmpty
+                    ? const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(20.0),
+                          child: Text(
+                            'No hay marcadores.\nToca el botón + en el lector para añadir uno.',
+                            textAlign: TextAlign.center,
+                          ),
                         ),
-                        onTap: () => onBookmarkTap(bookmark.pageNumber),
-                      );
-                    },
-                  ),
+                      )
+                    : ListView.builder(
+                        itemCount: updatedBook.bookmarks.length,
+                        itemBuilder: (context, index) {
+                          final bookmark = updatedBook.bookmarks[index];
+                          return ListTile(
+                            leading: const Icon(Icons.bookmark),
+                            title: Text(bookmark.title),
+                            subtitle: Text('Página ${bookmark.pageNumber + 1}'),
+                            trailing: IconButton(
+                              icon: const Icon(Icons.delete),
+                              onPressed: () {
+                                _confirmDelete(context, bookmark.id);
+                              },
+                            ),
+                            onTap: () => widget.onBookmarkTap(bookmark.pageNumber),
+                          );
+                        },
+                      ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -86,10 +102,14 @@ class BookmarksDrawer extends StatelessWidget {
             child: const Text('Cancelar'),
           ),
           TextButton(
-            onPressed: () {
-              Provider.of<AppProvider>(context, listen: false)
-                  .removeBookmark(book.id, bookmarkId);
-              Navigator.pop(context);
+            onPressed: () async {
+              await Provider.of<AppProvider>(context, listen: false)
+                  .removeBookmark(widget.book.id, bookmarkId);
+              if (context.mounted) {
+                Navigator.pop(context);
+                // Refrescar drawer
+                setState(() {});
+              }
             },
             child: const Text('Eliminar'),
           ),
