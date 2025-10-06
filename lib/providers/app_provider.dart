@@ -95,30 +95,38 @@ class AppProvider with ChangeNotifier {
   }
 
   Future<void> speak(String text) async {
+    debugPrint('📢 Provider: speak() llamado con ${text.length} caracteres');
     _isPlaying = true;
     notifyListeners();
+    
     await _ttsService.speak(text);
+    
+    debugPrint('📢 Provider: speak() completado');
     _isPlaying = false;
     notifyListeners();
   }
 
   Future<void> pause() async {
+    debugPrint('📢 Provider: pause() llamado');
     await _ttsService.pause();
     _isPlaying = false;
     notifyListeners();
   }
 
   Future<void> resume() async {
+    debugPrint('📢 Provider: resume() llamado');
     await _ttsService.resume();
     _isPlaying = true;
     notifyListeners();
   }
   
   void setPausedText(String text, int position) {
+    debugPrint('📢 Provider: setPausedText() - posición: $position');
     _ttsService.setPausedText(text, position);
   }
 
   Future<void> stop() async {
+    debugPrint('📢 Provider: stop() llamado');
     await _ttsService.stop();
     _isPlaying = false;
     notifyListeners();

@@ -216,7 +216,12 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
   }
 
   Future<void> _readCurrentPage() async {
+    debugPrint('📖 Reader: _readCurrentPage() iniciado - página $_currentPage');
+    debugPrint('📖 Reader: Texto disponible: ${_currentPageText.length} caracteres');
+    debugPrint('📖 Reader: StartIndex: $_selectedStartIndex');
+    
     if (_currentPageText.isEmpty) {
+      debugPrint('⚠️ Reader: Texto vacío, no se puede leer');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No hay texto para leer en esta página')),
       );
@@ -229,36 +234,65 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
     final startIndex = _selectedStartIndex.clamp(0, _currentPageText.length);
     final textToRead = _currentPageText.substring(startIndex);
     
+    debugPrint('📖 Reader: Texto a leer: ${textToRead.length} caracteres desde posición $startIndex');
+    
     // Iniciar animación del cursor
     _startCursorAnimation();
     
+    debugPrint('📖 Reader: Llamando a provider.speak()...');
     await provider.speak(textToRead);
+    debugPrint('📖 Reader: provider.speak() completado');
     
     // Detener animación cuando termine
     _stopCursorAnimation();
     
+    debugPrint('📖 Reader: Verificando si debe continuar a siguiente página');
+    debugPrint('📖 Reader: StartIndex era 0: ${startIndex == 0}');
+    debugPrint('📖 Reader: Página actual: $_currentPage, total: ${widget.book.totalPages}');
+    debugPrint('📖 Reader: Mounted: $mounted');
+    
     // Si terminó de leer la página completa y hay más páginas, continuar con la siguiente
     if (startIndex == 0 && _currentPage < widget.book.totalPages && mounted) {
       final isStillPlaying = Provider.of<AppProvider>(context, listen: false).isPlaying;
-      if (isStillPlaying) {
-        // Avanzar a la siguiente página
+      debugPrint('📖 Reader: isStillPlaying después de speak: $isStillPlaying');
+      
+      if (!isStillPlaying) {
+        debugPrint('✅ Reader: Avanzando a siguiente página...');
         await _goToNextPageAndContinueReading();
+      } else {
+        debugPrint('⚠️ Reader: No avanza porque isPlaying=true (extraño)');
       }
+    } else {
+      debugPrint('📖 Reader: NO avanza - startIndex: $startIndex, página: $_currentPage/${widget.book.totalPages}');
     }
   }
   
   Future<void> _goToNextPageAndContinueReading() async {
-    if (_currentPage >= widget.book.totalPages) return;
+    debugPrint('➡️ Reader: _goToNextPageAndContinueReading() iniciado');
+    debugPrint('➡️ Reader: Página actual: $_currentPage, total: ${widget.book.totalPages}');
+    
+    if (_currentPage >= widget.book.totalPages) {
+      debugPrint('⚠️ Reader: Ya en última página, no avanza');
+      return;
+    }
+    
+    final nextPage = _currentPage + 1;
+    debugPrint('➡️ Reader: Saltando a página $nextPage');
     
     // Avanzar página con scroll automático
-    _pdfViewerController.jumpToPage(_currentPage + 1);
+    _pdfViewerController.jumpToPage(nextPage);
     
     // Esperar a que se actualice la página
+    debugPrint('⏳ Reader: Esperando 800ms para scroll del PDF...');
     await Future.delayed(const Duration(milliseconds: 800));
     
     // La página se actualizó a través de onPageChanged que llama a _loadCurrentPageText
     // Esperar un poco más para que cargue el texto
+    debugPrint('⏳ Reader: Esperando 500ms adicionales para carga de texto...');
     await Future.delayed(const Duration(milliseconds: 500));
+    
+    debugPrint('📄 Reader: Texto nuevo cargado: ${_currentPageText.length} caracteres');
+    debugPrint('📄 Reader: Página después de saltar: $_currentPage');
     
     // Resetear posición de lectura al inicio de la nueva página
     setState(() {
@@ -266,16 +300,27 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
       _currentCharIndex = 0;
     });
     
+    debugPrint('📄 Reader: Posiciones reseteadas a 0');
+    
     // Continuar leyendo si todavía está en modo reproducción
     if (mounted) {
       final provider = Provider.of<AppProvider>(context, listen: false);
-      if (provider.isPlaying && _currentPageText.isNotEmpty) {
+      debugPrint('📄 Reader: Verificando si continuar - isPlaying: ${provider.isPlaying}');
+      debugPrint('📄 Reader: Texto disponible: ${_currentPageText.isNotEmpty}');
+      
+      if (!provider.isPlaying && _currentPageText.isNotEmpty) {
+        debugPrint('✅ Reader: Continuando lectura en página $_currentPage...');
         await _readCurrentPage();
+      } else {
+        debugPrint('⚠️ Reader: NO continúa - isPlaying: ${provider.isPlaying}, texto: ${_currentPageText.isNotEmpty}');
       }
+    } else {
+      debugPrint('⚠️ Reader: Widget no mounted, no continúa');
     }
   }
 
   void _handleStop() {
+    debugPrint('⏹️ Reader: _handleStop() llamado');
     final provider = Provider.of<AppProvider>(context, listen: false);
     _stopCursorAnimation();
     provider.stop();
@@ -283,40 +328,52 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
     setState(() {
       _isPaused = false;
     });
+    debugPrint('⏹️ Reader: Detenido');
   }
 
   void _handlePause() {
+    debugPrint('⏸️ Reader: _handlePause() llamado');
     final provider = Provider.of<AppProvider>(context, listen: false);
     _stopCursorAnimation();
     
     // Guardar posición exacta para resume
+    debugPrint('⏸️ Reader: Guardando posición - página: $_currentPage, char: $_currentCharIndex');
     provider.setPausedText(_currentPageText, _currentCharIndex);
     provider.pause();
     
     setState(() {
       _isPaused = true;
     });
+    debugPrint('⏸️ Reader: Pausado - estado guardado');
   }
   
   Future<void> _handlePlayOrResume() async {
+    debugPrint('▶️ Reader: _handlePlayOrResume() llamado - isPaused: $_isPaused');
     if (_isPaused) {
       // Reanudar desde donde se pausó
+      debugPrint('▶️ Reader: Modo RESUME');
       await _handleResume();
     } else {
       // Iniciar lectura normal
+      debugPrint('▶️ Reader: Modo PLAY normal');
       await _readCurrentPage();
     }
   }
   
   Future<void> _handleResume() async {
+    debugPrint('▶️ Reader: _handleResume() iniciado');
     final provider = Provider.of<AppProvider>(context, listen: false);
     
     setState(() {
       _isPaused = false;
     });
     
+    debugPrint('▶️ Reader: Llamando a provider.resume()...');
+    
     // Continuar desde la posición guardada
     await provider.resume();
+    
+    debugPrint('▶️ Reader: provider.resume() completado');
     
     // Reanudar animación del cursor
     _startCursorAnimation();
