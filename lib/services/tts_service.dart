@@ -15,6 +15,10 @@ class TtsService {
   String _pausedText = '';
   int _pausedPosition = 0;
   Completer<void>? _speechCompleter;
+  bool _shouldStop = false; // Nueva variable para control de parada
+  
+  // Máximo de caracteres por bloque para evitar error -8
+  static const int _maxCharsPerBlock = 3000;
 
   TtsService() {
     _initTts();
@@ -75,181 +79,210 @@ class TtsService {
     });
   }
 
+  // Divide el texto en bloques seguros para evitar error -8
+  List<String> _splitTextIntoBlocks(String text) {
+    final List<String> blocks = [];
+    
+    if (text.length <= _maxCharsPerBlock) {
+      return [text];
+    }
+    
+    int startIndex = 0;
+    while (startIndex < text.length) {
+      int endIndex = startIndex + _maxCharsPerBlock;
+      
+      // Si no es el último bloque, intentar cortar en un punto natural (punto, coma, espacio)
+      if (endIndex < text.length) {
+        // Buscar el último punto o salto de línea antes del límite
+        int lastPeriod = text.lastIndexOf('. ', endIndex);
+        int lastNewline = text.lastIndexOf('\n', endIndex);
+        int cutPoint = lastPeriod > startIndex ? lastPeriod + 2 : lastNewline;
+        
+        if (cutPoint > startIndex && cutPoint < endIndex) {
+          endIndex = cutPoint;
+        } else {
+          // Si no hay punto, buscar el último espacio
+          int lastSpace = text.lastIndexOf(' ', endIndex);
+          if (lastSpace > startIndex) {
+            endIndex = lastSpace + 1;
+          }
+        }
+      } else {
+        endIndex = text.length;
+      }
+      
+      blocks.add(text.substring(startIndex, endIndex));
+      startIndex = endIndex;
+    }
+    
+    return blocks;
+  }
+  
   Future<void> speak(String text) async {
     if (text.isEmpty) {
       _logger.log('TTS: ⚠️ Texto vacío, no se puede reproducir', level: LogLevel.warning);
-      debugPrint('⚠️ TTS: Texto vacío, no se puede reproducir');
       return;
     }
     
-    // CRÍTICO: Asegurar que el motor esté completamente detenido
-    _logger.log('TTS: 🧹 Limpiando estado previo...', level: LogLevel.debug);
-    debugPrint('🧹 TTS: Limpiando estado previo...');
-    
-    try {
-      await _flutterTts.stop();
-    } catch (e) {
-      _logger.log('TTS: ⚠️ Error al detener antes de speak: $e', level: LogLevel.warning);
-    }
-    
-    _isPlaying = false;
-    _isPaused = false;
-    
-    // Completar SOLO si no está ya completado
-    if (_speechCompleter != null && !_speechCompleter!.isCompleted) {
-      _speechCompleter!.complete();
-    }
-    _speechCompleter = null;
-    
-    // Delay más largo para estabilización
-    await Future.delayed(const Duration(milliseconds: 800));
+    // Limpiar estado
+    _logger.log('TTS: 🧹 Limpiando estado...', level: LogLevel.debug);
+    _shouldStop = false;
+    await _cleanupState();
     
     _logger.log('TTS: 🎤 Iniciando reproducción de ${text.length} caracteres', level: LogLevel.info);
-    debugPrint('🎤 TTS: Iniciando reproducción de ${text.length} caracteres');
     _pausedText = text;
     _pausedPosition = 0;
     _isPaused = false;
     
-    // Crear un completer para esperar a que termine realmente
+    // Dividir el texto en bloques seguros
+    final blocks = _splitTextIntoBlocks(text);
+    _logger.log('TTS: 📦 Texto dividido en ${blocks.length} bloques', level: LogLevel.info);
+    
+    try {
+      // Reproducir cada bloque secuencialmente
+      for (int i = 0; i < blocks.length; i++) {
+        if (_shouldStop) {
+          _logger.log('TTS: ⏹️ Detenido por solicitud del usuario', level: LogLevel.warning);
+          break;
+        }
+        
+        _logger.log('TTS: 📢 Reproduciendo bloque ${i + 1}/${blocks.length} (${blocks[i].length} chars)', level: LogLevel.debug);
+        await _speakSingleBlock(blocks[i]);
+        
+        // Pequeña pausa entre bloques para evitar problemas
+        if (i < blocks.length - 1 && !_shouldStop) {
+          await Future.delayed(const Duration(milliseconds: 100));
+        }
+      }
+      
+      _logger.log('TTS: ✅ Reproducción completa finalizada', level: LogLevel.success);
+      _isPlaying = false;
+      _isPaused = false;
+    } catch (e) {
+      _logger.log('TTS: ❌ Error durante reproducción: $e', level: LogLevel.error);
+      _isPlaying = false;
+      _isPaused = false;
+    }
+  }
+  
+  Future<void> _speakSingleBlock(String text) async {
+    if (_shouldStop) return;
+    
     _speechCompleter = Completer<void>();
     
     try {
       final result = await _flutterTts.speak(text);
-      _logger.log('TTS: speak() retornó: $result', level: LogLevel.debug);
-      debugPrint('🎤 TTS: speak() retornó: $result');
       
       if (result == 1) {
-        _logger.log('TTS: ✅ Comando speak ejecutado exitosamente', level: LogLevel.success);
-        debugPrint('✅ TTS: Comando speak ejecutado exitosamente');
         _isPlaying = true;
         
-        // Esperar a que complete realmente con timeout dinámico
+        // Esperar a que termine con timeout
         try {
           await _speechCompleter!.future.timeout(
-            Duration(seconds: (text.length / 10).ceil() + 30),
+            Duration(seconds: (text.length / 5).ceil() + 20),
           );
         } on TimeoutException {
-          _logger.log('TTS: ⏱️ Timeout en reproducción', level: LogLevel.warning);
-          debugPrint('⏱️ TTS: Timeout en reproducción');
+          _logger.log('TTS: ⏱️ Timeout en bloque', level: LogLevel.warning);
         }
-        
-        _logger.log('TTS: ✅ Reproducción finalizada completamente', level: LogLevel.success);
-        debugPrint('✅ TTS: Reproducción finalizada completamente');
       } else {
-        _logger.log('TTS: ❌ Error al ejecutar speak, código: $result', level: LogLevel.error);
-        debugPrint('❌ TTS: Error al ejecutar speak, código: $result');
+        _logger.log('TTS: ❌ Error en bloque, código: $result', level: LogLevel.error);
         if (!_speechCompleter!.isCompleted) {
           _speechCompleter!.complete();
         }
       }
     } catch (e) {
-      _logger.log('TTS: ⚠️ Excepción en speak: $e', level: LogLevel.error);
-      debugPrint('⚠️ TTS: Excepción en speak: $e');
+      _logger.log('TTS: ❌ Excepción en bloque: $e', level: LogLevel.error);
       if (_speechCompleter != null && !_speechCompleter!.isCompleted) {
         _speechCompleter!.complete();
       }
-      _isPlaying = false;
     }
+  }
+  
+  Future<void> _cleanupState() async {
+    try {
+      await _flutterTts.stop();
+    } catch (e) {
+      _logger.log('TTS: ⚠️ Error al detener: $e', level: LogLevel.warning);
+    }
+    
+    _isPlaying = false;
+    _isPaused = false;
+    
+    if (_speechCompleter != null && !_speechCompleter!.isCompleted) {
+      _speechCompleter!.complete();
+    }
+    _speechCompleter = null;
+    
+    await Future.delayed(const Duration(milliseconds: 300));
   }
 
   Future<void> pause() async {
     if (!_isPlaying) {
       _logger.log('TTS: ⚠️ No se puede pausar - no está reproduciendo', level: LogLevel.warning);
-      debugPrint('⚠️ TTS: No se puede pausar - no está reproduciendo');
       return;
     }
     
     _logger.log('TTS: ⏸️ Pausando reproducción', level: LogLevel.info);
-    debugPrint('⏸️ TTS: Pausando reproducción');
+    _shouldStop = true;
     
     try {
       await _flutterTts.stop();
-      await Future.delayed(const Duration(milliseconds: 300));
+      await Future.delayed(const Duration(milliseconds: 200));
       _isPaused = true;
       _isPlaying = false;
       
-      // Completar SOLO si no está ya completado
       if (_speechCompleter != null && !_speechCompleter!.isCompleted) {
         _speechCompleter!.complete();
       }
       
       _logger.log('TTS: ⏸️ Pausado - posición guardada: $_pausedPosition', level: LogLevel.info);
-      debugPrint('⏸️ TTS: Pausado - posición guardada: $_pausedPosition');
     } catch (e) {
       _logger.log('TTS: ❌ Error al pausar: $e', level: LogLevel.error);
-      debugPrint('❌ TTS: Error al pausar: $e');
     }
   }
 
   Future<void> resume() async {
     _logger.log('TTS: ▶️ Reanudando desde posición $_pausedPosition', level: LogLevel.info);
-    debugPrint('▶️ TTS: Reanudando desde posición $_pausedPosition');
     
     if (!_isPaused) {
       _logger.log('TTS: ⚠️ No se puede resumir - no está pausado', level: LogLevel.warning);
-      debugPrint('⚠️ TTS: No se puede resumir - no está pausado');
       return;
     }
     
     if (_pausedText.isEmpty) {
       _logger.log('TTS: ⚠️ No se puede resumir - texto vacío', level: LogLevel.warning);
-      debugPrint('⚠️ TTS: No se puede resumir - texto vacío');
       return;
     }
     
     _isPaused = false;
+    _shouldStop = false;
     
     try {
-      // CRÍTICO: Limpiar estado antes de resumir
-      _logger.log('TTS: 🧹 Limpiando estado previo...', level: LogLevel.debug);
-      debugPrint('🧹 TTS: Limpiando estado previo...');
-      
-      try {
-        await _flutterTts.stop();
-      } catch (e) {
-        _logger.log('TTS: ⚠️ Error al detener antes de resume: $e', level: LogLevel.warning);
-      }
-      
-      // Completar SOLO si no está ya completado
-      if (_speechCompleter != null && !_speechCompleter!.isCompleted) {
-        _speechCompleter!.complete();
-      }
-      _speechCompleter = null;
-      
-      await Future.delayed(const Duration(milliseconds: 800));
-      
-      // Crear nuevo completer
-      _speechCompleter = Completer<void>();
+      await _cleanupState();
       
       final textToSpeak = _pausedText.substring(_pausedPosition);
       _logger.log('TTS: ▶️ Reproduciendo ${textToSpeak.length} caracteres restantes', level: LogLevel.info);
-      debugPrint('▶️ TTS: Reproduciendo ${textToSpeak.length} caracteres restantes');
       
-      final result = await _flutterTts.speak(textToSpeak);
-      _logger.log('TTS: resume speak() retornó: $result', level: LogLevel.debug);
-      debugPrint('▶️ TTS: resume speak() retornó: $result');
+      // Usar el mismo sistema de bloques para resume
+      final blocks = _splitTextIntoBlocks(textToSpeak);
+      _logger.log('TTS: 📦 Texto de resume dividido en ${blocks.length} bloques', level: LogLevel.debug);
       
-      if (result == 1) {
-        _isPlaying = true;
-        
-        try {
-          await _speechCompleter!.future.timeout(
-            Duration(seconds: (textToSpeak.length / 10).ceil() + 30),
-          );
-        } on TimeoutException {
-          _logger.log('TTS: ⏱️ Timeout en resume', level: LogLevel.warning);
-          debugPrint('⏱️ TTS: Timeout en resume');
+      for (int i = 0; i < blocks.length; i++) {
+        if (_shouldStop) {
+          _logger.log('TTS: ⏹️ Resume detenido por solicitud', level: LogLevel.warning);
+          break;
         }
         
-        _logger.log('TTS: ✅ Resume completado', level: LogLevel.success);
-        debugPrint('✅ TTS: Resume completado');
+        await _speakSingleBlock(blocks[i]);
+        
+        if (i < blocks.length - 1 && !_shouldStop) {
+          await Future.delayed(const Duration(milliseconds: 100));
+        }
       }
+      
+      _logger.log('TTS: ✅ Resume completado', level: LogLevel.success);
     } catch (e) {
-      _logger.log('TTS: ⚠️ Excepción en resume: $e', level: LogLevel.error);
-      debugPrint('⚠️ TTS: Excepción en resume: $e');
-      if (_speechCompleter != null && !_speechCompleter!.isCompleted) {
-        _speechCompleter!.complete();
-      }
+      _logger.log('TTS: ❌ Excepción en resume: $e', level: LogLevel.error);
       _isPlaying = false;
     }
   }
@@ -258,32 +291,28 @@ class TtsService {
     _pausedText = text;
     _pausedPosition = position;
     _logger.log('TTS: 💾 Posición guardada: $position de ${text.length} caracteres', level: LogLevel.debug);
-    debugPrint('💾 TTS: Posición guardada: $position de ${text.length} caracteres');
   }
 
   Future<void> stop() async {
     _logger.log('TTS: ⏹️ Deteniendo reproducción', level: LogLevel.info);
-    debugPrint('⏹️ TTS: Deteniendo reproducción');
+    _shouldStop = true;
     
     try {
       await _flutterTts.stop();
-      await Future.delayed(const Duration(milliseconds: 300));
+      await Future.delayed(const Duration(milliseconds: 200));
       _isPlaying = false;
       _isPaused = false;
       _pausedText = '';
       _pausedPosition = 0;
       
-      // Completar SOLO si no está ya completado
       if (_speechCompleter != null && !_speechCompleter!.isCompleted) {
         _speechCompleter!.complete();
       }
       _speechCompleter = null;
       
       _logger.log('TTS: ⏹️ Detenido completamente', level: LogLevel.info);
-      debugPrint('⏹️ TTS: Detenido completamente');
     } catch (e) {
       _logger.log('TTS: ❌ Error al detener: $e', level: LogLevel.error);
-      debugPrint('❌ TTS: Error al detener: $e');
     }
   }
 
