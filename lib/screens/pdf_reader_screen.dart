@@ -34,11 +34,10 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
   // Para la selección de texto en el overlay
   int _selectedStartIndex = 0;
   
-  // Para el cursor animado
-  Timer? _cursorTimer;
-  Timer? _cursorBlinkTimer;
-  bool _cursorBlinkOn = true;
-  int _currentCharIndex = 0;
+  // Para el subrayado de línea sincronizado
+  Timer? _lineTimer;
+  int _currentLineIndex = 0;
+  List<String> _lines = [];
 
   @override
   void initState() {
@@ -63,10 +62,38 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
       setState(() {
         _currentPageText = text;
         _isLoadingText = false;
-        _currentCharIndex = 0;
+        _currentLineIndex = 0;
         _selectedStartIndex = 0;
+        // Dividir texto en líneas aproximadas (estimación por caracteres)
+        _lines = _splitIntoLines(text);
       });
     }
+  }
+  
+  // Divide texto en líneas aproximadas (~50 caracteres por línea)
+  List<String> _splitIntoLines(String text) {
+    if (text.isEmpty) return [];
+    final List<String> lines = [];
+    const int charsPerLine = 50;
+    
+    int start = 0;
+    while (start < text.length) {
+      int end = start + charsPerLine;
+      if (end > text.length) end = text.length;
+      
+      // Buscar final de palabra cercano para no cortar palabras
+      if (end < text.length) {
+        while (end > start && text[end] != ' ' && text[end] != '\n') {
+          end--;
+        }
+        if (end == start) end = start + charsPerLine; // Si no hay espacios, cortar forzado
+      }
+      
+      lines.add(text.substring(start, end));
+      start = end + 1;
+    }
+    
+    return lines;
   }
 
   void _onPageChanged(PdfPageChangedDetails details) {
@@ -91,7 +118,7 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
     final wasPlaying = provider.isPlaying;
     
     if (wasPlaying) {
-      _stopCursorAnimation();
+      _stopLineAnimation();
       provider.pause();
     }
     
@@ -103,70 +130,97 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
     final relativePosition = tapY / totalHeight;
     final estimatedIndex = (relativePosition * _currentPageText.length).clamp(0, _currentPageText.length - 1).toInt();
     
+    // Calcular línea aproximada desde el índice
+    int charCount = 0;
+    int lineIndex = 0;
+    for (int i = 0; i < _lines.length; i++) {
+      charCount += _lines[i].length;
+      if (charCount >= estimatedIndex) {
+        lineIndex = i;
+        break;
+      }
+    }
+    
     setState(() {
       _selectedStartIndex = estimatedIndex;
-      _currentCharIndex = estimatedIndex;
+      _currentLineIndex = lineIndex;
       _isPaused = wasPlaying; // Mantener estado de pausa solo si estaba reproduciendo
     });
     
-    _logger.log('Reader: Cursor colocado en posición $estimatedIndex (${(relativePosition * 100).toInt()}%)', level: LogLevel.info);
+    _logger.log('Reader: Cursor colocado en línea $lineIndex (${(relativePosition * 100).toInt()}%)', level: LogLevel.info);
     
     // Mostrar feedback visual suave
     ScaffoldMessenger.of(context).clearSnackBars();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('✓ Cursor en ${(relativePosition * 100).toInt()}% del texto'),
+        content: Text('✓ Línea ${lineIndex + 1} de ${_lines.length}'),
         duration: const Duration(milliseconds: 600),
         backgroundColor: Theme.of(context).primaryColor.withOpacity(0.8),
       ),
     );
   }
 
-  void _startCursorAnimation() {
-    _stopCursorAnimation(); // limpiar timers previos primero
-    // Iniciar parpadeo visible del cursor
-    _cursorBlinkOn = true;
-    _cursorBlinkTimer = Timer.periodic(const Duration(milliseconds: 550), (_) {
-      if (!mounted) return;
-      setState(() { _cursorBlinkOn = !_cursorBlinkOn; });
-    });
+  void _startLineAnimation() {
+    _stopLineAnimation(); // limpiar timers previos
     
     final provider = Provider.of<AppProvider>(context, listen: false);
     
-    // Usar el índice seleccionado
-    if (_selectedStartIndex >= 0 && _selectedStartIndex < _currentPageText.length) {
-      _currentCharIndex = _selectedStartIndex;
-    } else {
-      _currentCharIndex = 0;
+    // Calcular línea inicial desde selectedStartIndex
+    if (_selectedStartIndex >= 0) {
+      int charCount = 0;
+      for (int i = 0; i < _lines.length; i++) {
+        charCount += _lines[i].length;
+        if (charCount >= _selectedStartIndex) {
+          _currentLineIndex = i;
+          break;
+        }
+      }
     }
     
-    // Calcular velocidad basada en TTS
+    // Calcular tiempo por línea basado en velocidad TTS
     final speed = provider.ttsService.speechRate;
-    final charsPerSecond = (16.0 * speed);
-    final millisPerChar = (1000 / charsPerSecond).round();
+    final charsPerSecond = 16.0 * speed; // Aproximación de caracteres por segundo
     
-    _cursorTimer = Timer.periodic(Duration(milliseconds: millisPerChar), (timer) {
-      if (_currentCharIndex < _currentPageText.length && mounted) {
-        final isStillPlaying = Provider.of<AppProvider>(context, listen: false).isPlaying;
+    // Timer que avanza línea por línea
+    _lineTimer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
+      if (!mounted) {
+        _stopLineAnimation();
+        return;
+      }
+      
+      final isStillPlaying = Provider.of<AppProvider>(context, listen: false).isPlaying;
+      if (!isStillPlaying) {
+        _stopLineAnimation();
+        return;
+      }
+      
+      // Calcular qué línea debería estar mostrándose según tiempo transcurrido
+      if (_lines.isEmpty) return;
+      
+      // Estimar línea actual según caracteres pronunciados
+      int totalChars = 0;
+      for (int i = 0; i <= _currentLineIndex && i < _lines.length; i++) {
+        totalChars += _lines[i].length;
+      }
+      
+      // Si avanzamos suficientes caracteres, pasar a siguiente línea
+      if (_currentLineIndex < _lines.length - 1) {
+        final currentLineChars = _lines[_currentLineIndex].length;
+        final millisForCurrentLine = (currentLineChars / charsPerSecond * 1000).round();
         
-        if (!isStillPlaying) {
-          _stopCursorAnimation();
-          return;
+        // Avanzar línea según tiempo transcurrido aproximado
+        if (timer.tick * 100 >= millisForCurrentLine) {
+          setState(() {
+            _currentLineIndex++;
+          });
         }
-        
-        setState(() {
-          _currentCharIndex++;
-        });
-      } else {
-        _stopCursorAnimation();
       }
     });
   }
   
-  void _stopCursorAnimation() {
-    _cursorTimer?.cancel();
-    _cursorTimer = null;
-    _cursorBlinkTimer?.cancel();
+  void _stopLineAnimation() {
+    _lineTimer?.cancel();
+    _lineTimer = null;
   }
 
   Future<void> _readCurrentPage() async {
@@ -205,8 +259,8 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
       
       debugPrint('📖 Reader: Texto a leer: ${textToRead.length} caracteres desde posición $startIndex');
       
-      // Iniciar animación del cursor
-      _startCursorAnimation();
+      // Iniciar animación del subrayado de línea
+      _startLineAnimation();
       
       _logger.log('Reader: Llamando a provider.speak()...', level: LogLevel.info);
       debugPrint('📖 Reader: Llamando a provider.speak()...');
@@ -215,7 +269,7 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
       debugPrint('📖 Reader: provider.speak() completado');
       
       // Detener animación cuando termine
-      _stopCursorAnimation();
+      _stopLineAnimation();
       
       debugPrint('📖 Reader: Verificando si debe continuar a siguiente página');
       debugPrint('📖 Reader: StartIndex era 0: ${startIndex == 0}');
@@ -225,9 +279,9 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
       // Avance automático de página SOLO si:
       // 1) Se empezó a leer desde el inicio de la página (startIndex == 0)
       // 2) NO está en pausa (_isPaused == false)
-      // 3) Se llegó (o prácticamente llegó) al final del texto (_currentCharIndex >= length - 2)
+      // 3) Se llegó al final de las líneas (_currentLineIndex >= _lines.length - 1)
       // 4) Hay más páginas y el widget sigue montado
-      if (startIndex == 0 && !_isPaused && _currentCharIndex >= _currentPageText.length - 2 && _currentPage < widget.book.totalPages && mounted) {
+      if (startIndex == 0 && !_isPaused && _currentLineIndex >= _lines.length - 1 && _currentPage < widget.book.totalPages && mounted) {
         final isStillPlaying = Provider.of<AppProvider>(context, listen: false).isPlaying;
         debugPrint('📖 Reader: isStillPlaying después de speak: $isStillPlaying');
         
@@ -239,7 +293,7 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
           debugPrint('⚠️ Reader: No avanza porque isPlaying=true (estado inesperado)');
         }
       } else {
-        debugPrint('📖 Reader: NO avanza - startIndex: $startIndex, paused: $_isPaused, char: $_currentCharIndex/${_currentPageText.length}, página: $_currentPage/${widget.book.totalPages}');
+        debugPrint('📖 Reader: NO avanza - startIndex: $startIndex, paused: $_isPaused, lineIndex: $_currentLineIndex/${_lines.length}, página: $_currentPage/${widget.book.totalPages}');
       }
     } finally {
       _isReading = false;
@@ -289,7 +343,7 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
     // Resetear posición de lectura al inicio de la nueva página
     setState(() {
       _selectedStartIndex = 0;
-      _currentCharIndex = 0;
+      _currentLineIndex = 0;
     });
     
     debugPrint('📄 Reader: Posiciones reseteadas a 0');
@@ -315,22 +369,28 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
     debugPrint('⏸️ Reader: _handlePause() llamado');
     final provider = Provider.of<AppProvider>(context, listen: false);
     
-    // Detener animación del cursor PERO mantener cursor visible en última posición
-    _stopCursorAnimation();
+    // Detener animación del subrayado
+    _stopLineAnimation();
     
-    // Guardar posición exacta para resume - cursor en última palabra pronunciada
-    _logger.log('Reader: Guardando posición - página: $_currentPage, char: $_currentCharIndex', level: LogLevel.info);
-    debugPrint('⏸️ Reader: Guardando posición - página: $_currentPage, char: $_currentCharIndex');
-    provider.setPausedText(_currentPageText, _currentCharIndex);
+    // Guardar posición exacta para resume - línea actual
+    _logger.log('Reader: Guardando posición - página: $_currentPage, línea: $_currentLineIndex', level: LogLevel.info);
+    debugPrint('⏸️ Reader: Guardando posición - página: $_currentPage, línea: $_currentLineIndex');
+    
+    // Calcular índice de carácter desde línea actual
+    int charIndex = 0;
+    for (int i = 0; i < _currentLineIndex && i < _lines.length; i++) {
+      charIndex += _lines[i].length;
+    }
+    
+    provider.setPausedText(_currentPageText, charIndex);
     provider.pause();
     
     setState(() {
       _isPaused = true;
-      // Mantener _currentCharIndex donde quedó (última palabra leída)
-      // El cursor permanece visible mostrando esa posición
+      // Mantener _currentLineIndex donde quedó (última línea leída)
     });
-    _logger.log('Reader: ✅ Pausado - cursor visible en posición $_currentCharIndex', level: LogLevel.success);
-    debugPrint('⏸️ Reader: Pausado - cursor permanece visible en posición $_currentCharIndex');
+    _logger.log('Reader: ✅ Pausado - subrayado en línea $_currentLineIndex', level: LogLevel.success);
+    debugPrint('⏸️ Reader: Pausado - subrayado visible en línea $_currentLineIndex');
   }
   
   Future<void> _handlePlayOrResume() async {
@@ -366,8 +426,8 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
     
     debugPrint('▶️ Reader: provider.resume() completado');
     
-    // Reanudar animación del cursor
-    _startCursorAnimation();
+    // Reanudar animación del subrayado
+    _startLineAnimation();
   }
 
   Future<void> _translateAndRead() async {
@@ -546,15 +606,15 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
             ),
           ),
         
-        // Cursor visible dibujado sobre el PDF
-        if (_currentPageText.isNotEmpty)
+        // Subrayado de línea actual sobre el PDF
+        if (_currentPageText.isNotEmpty && _lines.isNotEmpty)
           Positioned.fill(
             child: IgnorePointer(
               child: CustomPaint(
-                painter: _CursorPainter(
-                  text: _currentPageText,
-                  charIndex: _currentCharIndex.clamp(0, _currentPageText.length - 1),
-                  visible: _cursorBlinkOn || context.watch<AppProvider>().isPlaying == true,
+                painter: _LineHighlighter(
+                  lines: _lines,
+                  currentLineIndex: _currentLineIndex,
+                  isPlaying: context.watch<AppProvider>().isPlaying,
                 ),
               ),
             ),
@@ -651,48 +711,64 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
   @override
   void dispose() {
     _pdfViewerController.dispose();
-    _stopCursorAnimation();
+    _stopLineAnimation();
     super.dispose();
   }
 }
 
-// Painter personalizado para dibujar cursor sobre el PDF
-class _CursorPainter extends CustomPainter {
-  final String text;
-  final int charIndex;
-  final bool visible;
+// Painter personalizado para subrayar línea actual sobre el PDF
+class _LineHighlighter extends CustomPainter {
+  final List<String> lines;
+  final int currentLineIndex;
+  final bool isPlaying;
   
-  _CursorPainter({
-    required this.text,
-    required this.charIndex,
-    required this.visible,
+  _LineHighlighter({
+    required this.lines,
+    required this.currentLineIndex,
+    required this.isPlaying,
   });
   
   @override
   void paint(Canvas canvas, Size size) {
-    if (!visible || text.isEmpty) return;
+    if (lines.isEmpty || currentLineIndex >= lines.length) return;
     
-    // Aproximación: colocar cursor vertical según proporción del índice dentro del texto
-    final ratio = (charIndex / text.length).clamp(0.0, 1.0);
-    final y = ratio * size.height;
+    // Calcular posición Y de la línea actual (proporción vertical)
+    final lineRatio = lines.isEmpty ? 0.0 : (currentLineIndex / lines.length).clamp(0.0, 1.0);
+    final y = lineRatio * size.height;
+    final lineHeight = size.height / (lines.length > 0 ? lines.length : 1);
     
+    // Pintar rectángulo semitransparente amarillo que subraya la línea
     final paint = Paint()
-      ..color = const Color(0xFFE91E63) // Rosa/fucsia visible
-      ..strokeWidth = 3.0
+      ..color = const Color(0x80FFEB3B) // Amarillo semitransparente
+      ..style = PaintingStyle.fill;
+    
+    // Rectángulo que cubre toda la línea actual
+    final rect = Rect.fromLTWH(
+      0,
+      y,
+      size.width,
+      lineHeight * 1.2, // Un poco más alto para mejor visibilidad
+    );
+    
+    canvas.drawRect(rect, paint);
+    
+    // Borde superior para mejor definición
+    final borderPaint = Paint()
+      ..color = const Color(0xFFFFD600) // Amarillo más intenso
+      ..strokeWidth = 2.0
       ..style = PaintingStyle.stroke;
     
-    // Dibujar línea horizontal como cursor
     canvas.drawLine(
-      Offset(size.width * 0.02, y),
-      Offset(size.width * 0.15, y),
-      paint,
+      Offset(0, y),
+      Offset(size.width, y),
+      borderPaint,
     );
   }
   
   @override
-  bool shouldRepaint(covariant _CursorPainter old) {
-    return old.charIndex != charIndex ||
-           old.visible != visible ||
-           old.text != text;
+  bool shouldRepaint(covariant _LineHighlighter old) {
+    return old.currentLineIndex != currentLineIndex ||
+           old.isPlaying != isPlaying ||
+           old.lines.length != lines.length;
   }
 }

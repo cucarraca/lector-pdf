@@ -1,8 +1,8 @@
 name: lector_pdf
-description: "Lector de PDF con audio y traducción automática"
+description: "Lector V2.0 - Lector de PDF con audio y traducción"
 publish_to: 'none'
 
-version: 1.0.0+1
+version: 2.0.0+1
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
