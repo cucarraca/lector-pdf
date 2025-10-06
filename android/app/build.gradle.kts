@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "com.lector.v2"
+    namespace = "com.example.lector_pdf"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -19,7 +19,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.lector.v2"
+        applicationId = "com.example.lector_pdf"
         minSdk = 24
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode

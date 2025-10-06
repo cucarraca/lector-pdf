@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:provider/provider.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 import '../models/pdf_book.dart';
@@ -28,10 +29,16 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
   String _currentPageText = '';
   bool _isLoadingText = false;
   bool _isPaused = false;
-  bool _isReading = false;
+  bool _isReading = false; // NUEVO: Evitar múltiples lecturas simultáneas
   
-  final TextEditingController _textController = TextEditingController();
-  final FocusNode _textFocusNode = FocusNode();
+  // Para la selección de texto en el overlay
+  int _selectedStartIndex = 0;
+  
+  // Para el cursor animado
+  Timer? _cursorTimer;
+  Timer? _cursorBlinkTimer;
+  bool _cursorBlinkOn = true;
+  int _currentCharIndex = 0;
 
   @override
   void initState() {
@@ -56,7 +63,8 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
       setState(() {
         _currentPageText = text;
         _isLoadingText = false;
-        _textController.text = text;
+        _currentCharIndex = 0;
+        _selectedStartIndex = 0;
       });
     }
   }
@@ -75,10 +83,90 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
     }
   }
 
-  void _onTextTap() {
-    // Al hacer tap, el TextField maneja la posición del cursor automáticamente
-    // Solo guardamos el índice cuando el usuario lo mueva
-    _textFocusNode.requestFocus();
+  void _onTextTap(TapDownDetails details, BoxConstraints constraints) {
+    if (_currentPageText.isEmpty) return;
+    
+    // Si está reproduciendo, pausar LIMPIAMENTE sin efectos secundarios
+    final provider = Provider.of<AppProvider>(context, listen: false);
+    final wasPlaying = provider.isPlaying;
+    
+    if (wasPlaying) {
+      _stopCursorAnimation();
+      provider.pause();
+    }
+    
+    // Calcular posición aproximada en el texto basándose en dónde se tocó
+    final tapY = details.localPosition.dy;
+    final totalHeight = constraints.maxHeight;
+    
+    // Estimación simple: posición vertical determina qué parte del texto
+    final relativePosition = tapY / totalHeight;
+    final estimatedIndex = (relativePosition * _currentPageText.length).clamp(0, _currentPageText.length - 1).toInt();
+    
+    setState(() {
+      _selectedStartIndex = estimatedIndex;
+      _currentCharIndex = estimatedIndex;
+      _isPaused = wasPlaying; // Mantener estado de pausa solo si estaba reproduciendo
+    });
+    
+    _logger.log('Reader: Cursor colocado en posición $estimatedIndex (${(relativePosition * 100).toInt()}%)', level: LogLevel.info);
+    
+    // Mostrar feedback visual suave
+    ScaffoldMessenger.of(context).clearSnackBars();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('✓ Cursor en ${(relativePosition * 100).toInt()}% del texto'),
+        duration: const Duration(milliseconds: 600),
+        backgroundColor: Theme.of(context).primaryColor.withOpacity(0.8),
+      ),
+    );
+  }
+
+  void _startCursorAnimation() {
+    _stopCursorAnimation(); // limpiar timers previos primero
+    // Iniciar parpadeo visible del cursor
+    _cursorBlinkOn = true;
+    _cursorBlinkTimer = Timer.periodic(const Duration(milliseconds: 550), (_) {
+      if (!mounted) return;
+      setState(() { _cursorBlinkOn = !_cursorBlinkOn; });
+    });
+    
+    final provider = Provider.of<AppProvider>(context, listen: false);
+    
+    // Usar el índice seleccionado
+    if (_selectedStartIndex >= 0 && _selectedStartIndex < _currentPageText.length) {
+      _currentCharIndex = _selectedStartIndex;
+    } else {
+      _currentCharIndex = 0;
+    }
+    
+    // Calcular velocidad basada en TTS
+    final speed = provider.ttsService.speechRate;
+    final charsPerSecond = (16.0 * speed);
+    final millisPerChar = (1000 / charsPerSecond).round();
+    
+    _cursorTimer = Timer.periodic(Duration(milliseconds: millisPerChar), (timer) {
+      if (_currentCharIndex < _currentPageText.length && mounted) {
+        final isStillPlaying = Provider.of<AppProvider>(context, listen: false).isPlaying;
+        
+        if (!isStillPlaying) {
+          _stopCursorAnimation();
+          return;
+        }
+        
+        setState(() {
+          _currentCharIndex++;
+        });
+      } else {
+        _stopCursorAnimation();
+      }
+    });
+  }
+  
+  void _stopCursorAnimation() {
+    _cursorTimer?.cancel();
+    _cursorTimer = null;
+    _cursorBlinkTimer?.cancel();
   }
 
   Future<void> _readCurrentPage() async {
@@ -94,6 +182,9 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
     try {
       _logger.log('Reader: 📖 _readCurrentPage() iniciado - página $_currentPage', level: LogLevel.info);
       debugPrint('📖 Reader: _readCurrentPage() iniciado - página $_currentPage');
+      _logger.log('Reader: Texto disponible: ${_currentPageText.length} caracteres', level: LogLevel.info);
+      debugPrint('📖 Reader: Texto disponible: ${_currentPageText.length} caracteres');
+      debugPrint('📖 Reader: StartIndex: $_selectedStartIndex');
       
       if (_currentPageText.isEmpty) {
         _logger.log('Reader: ⚠️ Texto vacío, no se puede leer', level: LogLevel.warning);
@@ -108,26 +199,47 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
 
       final provider = Provider.of<AppProvider>(context, listen: false);
       
-      // Obtener posición del cursor en el TextField
-      final cursorPosition = _textController.selection.baseOffset;
-      final startIndex = cursorPosition >= 0 ? cursorPosition : 0;
+      // Leer desde la posición seleccionada
+      final startIndex = _selectedStartIndex.clamp(0, _currentPageText.length);
       final textToRead = _currentPageText.substring(startIndex);
       
-      debugPrint('📖 Reader: Leyendo desde posición de cursor: $startIndex');
-      debugPrint('📖 Reader: Texto a leer: ${textToRead.length} caracteres');
+      debugPrint('📖 Reader: Texto a leer: ${textToRead.length} caracteres desde posición $startIndex');
       
+      // Iniciar animación del cursor
+      _startCursorAnimation();
+      
+      _logger.log('Reader: Llamando a provider.speak()...', level: LogLevel.info);
+      debugPrint('📖 Reader: Llamando a provider.speak()...');
       await provider.speak(textToRead);
       _logger.log('Reader: ✅ provider.speak() completado', level: LogLevel.success);
       debugPrint('📖 Reader: provider.speak() completado');
       
-      // Avance automático si empezó desde el inicio
-      if (startIndex == 0 && !_isPaused && _currentPage < widget.book.totalPages && mounted) {
+      // Detener animación cuando termine
+      _stopCursorAnimation();
+      
+      debugPrint('📖 Reader: Verificando si debe continuar a siguiente página');
+      debugPrint('📖 Reader: StartIndex era 0: ${startIndex == 0}');
+      debugPrint('📖 Reader: Página actual: $_currentPage, total: ${widget.book.totalPages}');
+      debugPrint('📖 Reader: Mounted: $mounted');
+      
+      // Avance automático de página SOLO si:
+      // 1) Se empezó a leer desde el inicio de la página (startIndex == 0)
+      // 2) NO está en pausa (_isPaused == false)
+      // 3) Se llegó (o prácticamente llegó) al final del texto (_currentCharIndex >= length - 2)
+      // 4) Hay más páginas y el widget sigue montado
+      if (startIndex == 0 && !_isPaused && _currentCharIndex >= _currentPageText.length - 2 && _currentPage < widget.book.totalPages && mounted) {
         final isStillPlaying = Provider.of<AppProvider>(context, listen: false).isPlaying;
+        debugPrint('📖 Reader: isStillPlaying después de speak: $isStillPlaying');
         
         if (!isStillPlaying) {
-          _logger.log('Reader: ✅ Avanzando a siguiente página', level: LogLevel.success);
+          _logger.log('Reader: ✅ Avanzando a siguiente página (fin de página alcanzado)', level: LogLevel.success);
+          debugPrint('✅ Reader: Avanzando a siguiente página (fin de página alcanzado)');
           await _goToNextPageAndContinueReading();
+        } else {
+          debugPrint('⚠️ Reader: No avanza porque isPlaying=true (estado inesperado)');
         }
+      } else {
+        debugPrint('📖 Reader: NO avanza - startIndex: $startIndex, paused: $_isPaused, char: $_currentCharIndex/${_currentPageText.length}, página: $_currentPage/${widget.book.totalPages}');
       }
     } finally {
       _isReading = false;
@@ -176,7 +288,8 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
     
     // Resetear posición de lectura al inicio de la nueva página
     setState(() {
-      _textController.selection = const TextSelection.collapsed(offset: 0);
+      _selectedStartIndex = 0;
+      _currentCharIndex = 0;
     });
     
     debugPrint('📄 Reader: Posiciones reseteadas a 0');
@@ -199,19 +312,25 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
 
   void _handlePause() {
     _logger.log('Reader: ⏸️ _handlePause() llamado', level: LogLevel.info);
+    debugPrint('⏸️ Reader: _handlePause() llamado');
     final provider = Provider.of<AppProvider>(context, listen: false);
     
-    // Obtener posición actual del cursor
-    final cursorPosition = _textController.selection.baseOffset;
+    // Detener animación del cursor PERO mantener cursor visible en última posición
+    _stopCursorAnimation();
     
-    _logger.log('Reader: Guardando posición - página: $_currentPage, cursor: $cursorPosition', level: LogLevel.info);
-    
-    provider.setPausedText(_currentPageText, cursorPosition >= 0 ? cursorPosition : 0);
+    // Guardar posición exacta para resume - cursor en última palabra pronunciada
+    _logger.log('Reader: Guardando posición - página: $_currentPage, char: $_currentCharIndex', level: LogLevel.info);
+    debugPrint('⏸️ Reader: Guardando posición - página: $_currentPage, char: $_currentCharIndex');
+    provider.setPausedText(_currentPageText, _currentCharIndex);
     provider.pause();
     
     setState(() {
       _isPaused = true;
+      // Mantener _currentCharIndex donde quedó (última palabra leída)
+      // El cursor permanece visible mostrando esa posición
     });
+    _logger.log('Reader: ✅ Pausado - cursor visible en posición $_currentCharIndex', level: LogLevel.success);
+    debugPrint('⏸️ Reader: Pausado - cursor permanece visible en posición $_currentCharIndex');
   }
   
   Future<void> _handlePlayOrResume() async {
@@ -232,13 +351,23 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
   
   Future<void> _handleResume() async {
     _logger.log('Reader: ▶️ _handleResume() iniciado', level: LogLevel.info);
+    debugPrint('▶️ Reader: _handleResume() iniciado');
     final provider = Provider.of<AppProvider>(context, listen: false);
     
     setState(() {
       _isPaused = false;
     });
     
+    _logger.log('Reader: Llamando a provider.resume()...', level: LogLevel.info);
+    debugPrint('▶️ Reader: Llamando a provider.resume()...');
+    
+    // Continuar desde la posición guardada
     await provider.resume();
+    
+    debugPrint('▶️ Reader: provider.resume() completado');
+    
+    // Reanudar animación del cursor
+    _startCursorAnimation();
   }
 
   Future<void> _translateAndRead() async {
@@ -250,8 +379,7 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
     }
 
     final provider = Provider.of<AppProvider>(context, listen: false);
-    final cursorPosition = _textController.selection.baseOffset;
-    final startIndex = cursorPosition >= 0 ? cursorPosition : 0;
+    final startIndex = _selectedStartIndex.clamp(0, _currentPageText.length);
     final textToTranslate = _currentPageText.substring(startIndex);
     await provider.translateAndSpeak(textToTranslate);
   }
@@ -386,40 +514,51 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
   Widget _buildPdfWithOverlay() {
     return Stack(
       children: [
-        // Capa 1: El visor PDF (fondo)
+        // Capa 1: El visor PDF
         SfPdfViewer.file(
           File(widget.book.filePath),
           controller: _pdfViewerController,
           onPageChanged: _onPageChanged,
         ),
         
-        // Capa 2: TextField con el texto extraído y cursor manejable
+        // Capa 2: Captura tap simple para colocar cursor SIN bloquear scroll/zoom
         if (_currentPageText.isNotEmpty)
           Positioned.fill(
-            child: Container(
-              color: Colors.white.withOpacity(0.95), // Fondo semi-opaco para ver el texto
-              padding: const EdgeInsets.all(16),
-              child: SingleChildScrollView(
-                child: TextField(
-                  controller: _textController,
-                  focusNode: _textFocusNode,
-                  maxLines: null,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    height: 1.5,
-                    color: Colors.black87,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                return Listener(
+                  behavior: HitTestBehavior.deferToChild,
+                  onPointerDown: (evt) {
+                    if (evt.kind == PointerDeviceKind.touch) {
+                      // Solo registrar tap corto: convertimos a TapDown manual aproximado
+                      final details = TapDownDetails(
+                        localPosition: evt.localPosition,
+                      );
+                      _onTextTap(details, constraints);
+                    }
+                  },
+                  child: IgnorePointer(
+                    ignoring: true, // No consume gestos de scroll del visor PDF
+                    child: Container(color: Colors.transparent),
                   ),
-                  decoration: const InputDecoration(
-                    border: InputBorder.none,
-                    contentPadding: EdgeInsets.zero,
-                  ),
-                  readOnly: false, // Permitir mover el cursor
-                  onTap: _onTextTap,
+                );
+              },
+            ),
+          ),
+        
+        // Cursor visible dibujado sobre el PDF
+        if (_currentPageText.isNotEmpty)
+          Positioned.fill(
+            child: IgnorePointer(
+              child: CustomPaint(
+                painter: _CursorPainter(
+                  text: _currentPageText,
+                  charIndex: _currentCharIndex.clamp(0, _currentPageText.length - 1),
+                  visible: _cursorBlinkOn || context.watch<AppProvider>().isPlaying == true,
                 ),
               ),
             ),
           ),
-        
         // Indicador de página
         Positioned(
           bottom: 16,
@@ -512,8 +651,48 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
   @override
   void dispose() {
     _pdfViewerController.dispose();
-    _textController.dispose();
-    _textFocusNode.dispose();
+    _stopCursorAnimation();
     super.dispose();
+  }
+}
+
+// Painter personalizado para dibujar cursor sobre el PDF
+class _CursorPainter extends CustomPainter {
+  final String text;
+  final int charIndex;
+  final bool visible;
+  
+  _CursorPainter({
+    required this.text,
+    required this.charIndex,
+    required this.visible,
+  });
+  
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (!visible || text.isEmpty) return;
+    
+    // Aproximación: colocar cursor vertical según proporción del índice dentro del texto
+    final ratio = (charIndex / text.length).clamp(0.0, 1.0);
+    final y = ratio * size.height;
+    
+    final paint = Paint()
+      ..color = const Color(0xFFE91E63) // Rosa/fucsia visible
+      ..strokeWidth = 3.0
+      ..style = PaintingStyle.stroke;
+    
+    // Dibujar línea horizontal como cursor
+    canvas.drawLine(
+      Offset(size.width * 0.02, y),
+      Offset(size.width * 0.15, y),
+      paint,
+    );
+  }
+  
+  @override
+  bool shouldRepaint(covariant _CursorPainter old) {
+    return old.charIndex != charIndex ||
+           old.visible != visible ||
+           old.text != text;
   }
 }
