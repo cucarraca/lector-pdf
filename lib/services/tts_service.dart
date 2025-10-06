@@ -82,6 +82,14 @@ class TtsService {
       return;
     }
     
+    // CRÍTICO: Asegurar que el motor esté limpio antes de hablar
+    _logger.log('TTS: 🧹 Limpiando estado previo...', level: LogLevel.debug);
+    debugPrint('🧹 TTS: Limpiando estado previo...');
+    await _flutterTts.stop();
+    
+    // Delay de seguridad para que el motor TTS se estabilice
+    await Future.delayed(const Duration(milliseconds: 200));
+    
     _logger.log('TTS: 🎤 Iniciando reproducción de ${text.length} caracteres', level: LogLevel.info);
     debugPrint('🎤 TTS: Iniciando reproducción de ${text.length} caracteres');
     _pausedText = text;
@@ -100,12 +108,18 @@ class TtsService {
       debugPrint('✅ TTS: Comando speak ejecutado exitosamente');
       _isPlaying = true;
       // Esperar a que complete realmente
-      await _speechCompleter!.future;
-      _logger.log('TTS: ✅ Reproducción finalizada completamente', level: LogLevel.success);
-      debugPrint('✅ TTS: Reproducción finalizada completamente');
+      try {
+        await _speechCompleter!.future;
+        _logger.log('TTS: ✅ Reproducción finalizada completamente', level: LogLevel.success);
+        debugPrint('✅ TTS: Reproducción finalizada completamente');
+      } catch (e) {
+        _logger.log('TTS: ⚠️ Reproducción interrumpida: $e', level: LogLevel.warning);
+        debugPrint('⚠️ TTS: Reproducción interrumpida: $e');
+      }
     } else {
       _logger.log('TTS: ❌ Error al ejecutar speak, código: $result', level: LogLevel.error);
       debugPrint('❌ TTS: Error al ejecutar speak, código: $result');
+      _speechCompleter?.complete();
     }
   }
 
@@ -125,6 +139,12 @@ class TtsService {
     if (_isPaused && _pausedText.isNotEmpty) {
       _isPaused = false;
       
+      // CRÍTICO: Limpiar estado antes de resumir
+      _logger.log('TTS: 🧹 Limpiando estado previo...', level: LogLevel.debug);
+      debugPrint('🧹 TTS: Limpiando estado previo...');
+      await _flutterTts.stop();
+      await Future.delayed(const Duration(milliseconds: 200));
+      
       // Crear nuevo completer
       _speechCompleter = Completer<void>();
       
@@ -138,9 +158,14 @@ class TtsService {
       
       if (result == 1) {
         _isPlaying = true;
-        await _speechCompleter!.future;
-        _logger.log('TTS: ✅ Resume completado', level: LogLevel.success);
-        debugPrint('✅ TTS: Resume completado');
+        try {
+          await _speechCompleter!.future;
+          _logger.log('TTS: ✅ Resume completado', level: LogLevel.success);
+          debugPrint('✅ TTS: Resume completado');
+        } catch (e) {
+          _logger.log('TTS: ⚠️ Resume interrumpido: $e', level: LogLevel.warning);
+          debugPrint('⚠️ TTS: Resume interrumpido: $e');
+        }
       }
     } else {
       _logger.log('TTS: ⚠️ No se puede resumir - isPaused: $_isPaused, texto vacío: ${_pausedText.isEmpty}', level: LogLevel.warning);
