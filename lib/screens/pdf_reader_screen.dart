@@ -10,6 +10,7 @@ import '../services/log_service.dart';
 import '../widgets/reader_controls.dart';
 import '../widgets/bookmarks_drawer.dart';
 import 'logs_screen.dart';
+import 'text_view_screen.dart';
 
 class PdfReaderScreen extends StatefulWidget {
   final PdfBook book;
@@ -459,6 +460,22 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
       appBar: AppBar(
         title: Text(widget.book.title),
         actions: [
+          // Botón para cambiar a vista texto
+          IconButton(
+            icon: const Icon(Icons.text_fields),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => TextViewScreen(
+                    book: widget.book,
+                    initialPage: _currentPage,
+                  ),
+                ),
+              );
+            },
+            tooltip: 'Vista de texto',
+          ),
           // Botón de logs
           IconButton(
             icon: const Icon(Icons.bug_report),

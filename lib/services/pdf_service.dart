@@ -33,16 +33,50 @@ class PdfService {
         return '';
       }
       
-      final String text = PdfTextExtractor(document).extractText(
+      String text = PdfTextExtractor(document).extractText(
         startPageIndex: pageIndex,
         endPageIndex: pageIndex,
       );
       
       document.dispose();
+      
+      // Mejorar formato: normalizar saltos de línea y espacios
+      text = _improveTextFormatting(text);
+      
       return text;
     } catch (e) {
       debugPrint('Error al extraer texto de la página: $e');
       return '';
+    }
+  }
+  
+  // Mejorar el formato del texto extraído
+  String _improveTextFormatting(String text) {
+    if (text.isEmpty) return text;
+    
+    // Normalizar múltiples espacios a uno solo
+    text = text.replaceAll(RegExp(r' +'), ' ');
+    
+    // Mantener saltos de línea simples, eliminar múltiples vacíos
+    text = text.replaceAll(RegExp(r'\n\s*\n\s*\n+'), '\n\n');
+    
+    // Eliminar espacios al inicio/final de cada línea
+    text = text.split('\n').map((line) => line.trim()).join('\n');
+    
+    // Eliminar líneas completamente vacías al inicio y final
+    text = text.trim();
+    
+    return text;
+  }
+  
+  // Detectar si el PDF tiene texto extraíble o es escaneado
+  Future<bool> hasExtractableText(String pdfPath) async {
+    try {
+      final String firstPageText = await extractTextFromPage(pdfPath, 0);
+      // Si la primera página tiene al menos 50 caracteres, asumimos que tiene texto
+      return firstPageText.trim().length >= 50;
+    } catch (e) {
+      return false;
     }
   }
 
