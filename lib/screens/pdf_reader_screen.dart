@@ -632,36 +632,11 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
                           fontSize: 12,
                         ),
                       ),
-                    ],
+                                        ],
                   ),
                 ),
               ),
             ),
-
-class _CursorPainter extends CustomPainter {
-  final String text;
-  final int charIndex;
-  final bool visible;
-  _CursorPainter({required this.text, required this.charIndex, required this.visible});
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (!visible) return;
-    if (text.isEmpty) return;
-    // Aproximación: colocar cursor vertical según proporción del índice dentro del texto
-    final ratio = text.isEmpty ? 0.0 : (charIndex / text.length).clamp(0.0, 1.0);
-    final y = ratio * size.height;
-    final paint = Paint()
-      ..color = const Color(0xFFE91E63)
-      ..strokeWidth = 2.0
-      ..style = PaintingStyle.stroke;
-    canvas.drawLine(Offset(size.width * 0.02, y), Offset(size.width * 0.12, y), paint);
-  }
-  @override
-  bool shouldRepaint(covariant _CursorPainter old) {
-    return old.charIndex != charIndex || old.visible != visible || old.text != text;
-  }
-}
-
           ),
         
         // Indicador de carga
@@ -678,5 +653,46 @@ class _CursorPainter extends CustomPainter {
     _pdfViewerController.dispose();
     _stopCursorAnimation();
     super.dispose();
+  }
+}
+
+// Painter personalizado para dibujar cursor sobre el PDF
+class _CursorPainter extends CustomPainter {
+  final String text;
+  final int charIndex;
+  final bool visible;
+  
+  _CursorPainter({
+    required this.text,
+    required this.charIndex,
+    required this.visible,
+  });
+  
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (!visible || text.isEmpty) return;
+    
+    // Aproximación: colocar cursor vertical según proporción del índice dentro del texto
+    final ratio = (charIndex / text.length).clamp(0.0, 1.0);
+    final y = ratio * size.height;
+    
+    final paint = Paint()
+      ..color = const Color(0xFFE91E63) // Rosa/fucsia visible
+      ..strokeWidth = 3.0
+      ..style = PaintingStyle.stroke;
+    
+    // Dibujar línea horizontal como cursor
+    canvas.drawLine(
+      Offset(size.width * 0.02, y),
+      Offset(size.width * 0.15, y),
+      paint,
+    );
+  }
+  
+  @override
+  bool shouldRepaint(covariant _CursorPainter old) {
+    return old.charIndex != charIndex ||
+           old.visible != visible ||
+           old.text != text;
   }
 }
