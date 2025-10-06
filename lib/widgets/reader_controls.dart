@@ -5,7 +5,6 @@ class ReaderControls extends StatelessWidget {
   final bool isTranslating;
   final VoidCallback onPlay;
   final VoidCallback onPause;
-  final VoidCallback onStop;
   final VoidCallback onTranslate;
   final VoidCallback onAddBookmark;
   final VoidCallback onChangeVoice;
@@ -18,7 +17,6 @@ class ReaderControls extends StatelessWidget {
     required this.isTranslating,
     required this.onPlay,
     required this.onPause,
-    required this.onStop,
     required this.onTranslate,
     required this.onAddBookmark,
     required this.onChangeVoice,
@@ -69,12 +67,6 @@ class ReaderControls extends StatelessWidget {
                 tooltip: isPlaying ? 'Pausar' : 'Reproducir',
                 iconSize: 40,
                 color: Theme.of(context).colorScheme.primary,
-              ),
-              IconButton(
-                icon: const Icon(Icons.stop),
-                onPressed: onStop,
-                tooltip: 'Detener',
-                iconSize: 28,
               ),
               IconButton(
                 icon: isTranslating

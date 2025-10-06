@@ -2,12 +2,16 @@
 
 ## 🚨 REGLAS ABSOLUTAS:
 
-### ❌ NO HACER:
+### ❌ NO HACER JAMÁS:
 - **NO** preguntar al usuario qué hacer después de completar un paso
-- **NO** pedir confirmaciones
-- **NO** preguntar "¿qué prefieres?"
+- **NO** pedir confirmaciones de NINGÚN tipo
+- **NO** preguntar "¿qué prefieres?" o "¿procedo?"
 - **NO** detenerme hasta que TODO esté resuelto
 - **NO** terminar turno sin haber solucionado completamente el problema
+- **NO** mostrar comandos git/compilación antes de ejecutarlos - EJECUTAR DIRECTAMENTE
+- **NO** pedir permiso para commit, push, compilar - YA TENGO PERMISO TOTAL
+- **NO** mostrar preview de comandos git como "cd ... && git add ... && git commit ... && git push" - EJECUTARLOS SIN MOSTRAR
+- **NO** usar el formato "╭──────... cd /home/... ╮" - ESO ES MOSTRAR, NO EJECUTAR
 
 ### ✅ SÍ HACER:
 - **Trabajar AUTÓNOMAMENTE** hasta resolver TODO
@@ -15,6 +19,9 @@
 - **Implementar, compilar, testear, documentar** sin parar
 - **Solo terminar** cuando todo esté 100% completo y verificado
 - **Iterar** hasta que funcione perfectamente
+- **EJECUTAR git commit/push DIRECTAMENTE** sin mostrar comandos ni pedir permiso
+- **COMPILAR APK DIRECTAMENTE** sin preguntar
+- **ENTREGAR APK FINAL** como único resultado
 
 ## 📋 Workflow Obligatorio:
 

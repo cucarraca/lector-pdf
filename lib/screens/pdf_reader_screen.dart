@@ -80,6 +80,16 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
   void _onTextTap(TapDownDetails details, BoxConstraints constraints) {
     if (_currentPageText.isEmpty) return;
     
+    // Detener cualquier reproducción en curso
+    final provider = Provider.of<AppProvider>(context, listen: false);
+    if (provider.isPlaying) {
+      _stopCursorAnimation();
+      provider.pause();
+      setState(() {
+        _isPaused = true;
+      });
+    }
+    
     // Calcular posición aproximada en el texto basándose en dónde se tocó
     final tapY = details.localPosition.dy;
     final totalHeight = constraints.maxHeight;
@@ -91,90 +101,18 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
     setState(() {
       _selectedStartIndex = estimatedIndex;
       _currentCharIndex = estimatedIndex;
+      // NO reiniciar _isPaused aquí - mantener estado
     });
     
-    // Mostrar feedback visual
+    _logger.log('Reader: Cursor colocado en posición $estimatedIndex (${(relativePosition * 100).toInt()}%)', level: LogLevel.info);
+    
+    // Mostrar feedback visual suave
     ScaffoldMessenger.of(context).clearSnackBars();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Leer desde posición ${(relativePosition * 100).toInt()}%'),
-        duration: const Duration(seconds: 1),
-      ),
-    );
-  }
-
-  void _showPositionSelector() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Seleccionar posición'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.skip_previous),
-              title: const Text('Inicio (0%)'),
-              onTap: () {
-                setState(() {
-                  _selectedStartIndex = 0;
-                  _currentCharIndex = 0;
-                });
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Leer desde el inicio')),
-                );
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.play_arrow),
-              title: const Text('25%'),
-              onTap: () {
-                setState(() {
-                  _selectedStartIndex = (_currentPageText.length * 0.25).toInt();
-                  _currentCharIndex = _selectedStartIndex;
-                });
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Leer desde 25%')),
-                );
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.play_arrow),
-              title: const Text('Medio (50%)'),
-              onTap: () {
-                setState(() {
-                  _selectedStartIndex = (_currentPageText.length * 0.5).toInt();
-                  _currentCharIndex = _selectedStartIndex;
-                });
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Leer desde la mitad')),
-                );
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.play_arrow),
-              title: const Text('75%'),
-              onTap: () {
-                setState(() {
-                  _selectedStartIndex = (_currentPageText.length * 0.75).toInt();
-                  _currentCharIndex = _selectedStartIndex;
-                });
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Leer desde 75%')),
-                );
-              },
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar'),
-          ),
-        ],
+        content: Text('✓ Cursor posicionado en ${(relativePosition * 100).toInt()}% del texto'),
+        duration: const Duration(milliseconds: 800),
+        backgroundColor: Theme.of(context).primaryColor,
       ),
     );
   }
@@ -301,15 +239,28 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
       return;
     }
     
+    // IMPORTANTE: Verificar que todavía se está reproduciendo
+    final provider = Provider.of<AppProvider>(context, listen: false);
+    if (!provider.isPlaying && !_isPaused) {
+      debugPrint('⚠️ Reader: Reproducción detenida por usuario, cancelando avance automático');
+      return;
+    }
+    
     final nextPage = _currentPage + 1;
     debugPrint('➡️ Reader: Saltando a página $nextPage');
     
-    // Avanzar página con scroll automático
+    // Avanzar página con scroll automático SOLO si está reproduciendo
     _pdfViewerController.jumpToPage(nextPage);
     
     // Esperar a que se actualice la página
     debugPrint('⏳ Reader: Esperando 800ms para scroll del PDF...');
     await Future.delayed(const Duration(milliseconds: 800));
+    
+    // Verificar de nuevo que no se pausó durante el delay
+    if (_isPaused) {
+      debugPrint('⚠️ Reader: Pausado durante scroll, cancelando lectura continua');
+      return;
+    }
     
     // La página se actualizó a través de onPageChanged que llama a _loadCurrentPageText
     // Esperar un poco más para que cargue el texto
@@ -329,41 +280,29 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
     
     // Continuar leyendo si todavía está en modo reproducción
     if (mounted) {
-      final provider = Provider.of<AppProvider>(context, listen: false);
-      debugPrint('📄 Reader: Verificando si continuar - isPlaying: ${provider.isPlaying}');
+      debugPrint('📄 Reader: Verificando si continuar - isPlaying: ${provider.isPlaying}, isPaused: $_isPaused');
       debugPrint('📄 Reader: Texto disponible: ${_currentPageText.isNotEmpty}');
       
-      if (!provider.isPlaying && _currentPageText.isNotEmpty) {
+      if (!provider.isPlaying && !_isPaused && _currentPageText.isNotEmpty) {
         debugPrint('✅ Reader: Continuando lectura en página $_currentPage...');
         await _readCurrentPage();
       } else {
-        debugPrint('⚠️ Reader: NO continúa - isPlaying: ${provider.isPlaying}, texto: ${_currentPageText.isNotEmpty}');
+        debugPrint('⚠️ Reader: NO continúa - isPlaying: ${provider.isPlaying}, isPaused: $_isPaused, texto: ${_currentPageText.isNotEmpty}');
       }
     } else {
       debugPrint('⚠️ Reader: Widget no mounted, no continúa');
     }
   }
 
-  void _handleStop() {
-    debugPrint('⏹️ Reader: _handleStop() llamado');
-    final provider = Provider.of<AppProvider>(context, listen: false);
-    _stopCursorAnimation();
-    _isReading = false; // IMPORTANTE: Resetear flag de lectura
-    provider.stop();
-    
-    setState(() {
-      _isPaused = false;
-    });
-    debugPrint('⏹️ Reader: Detenido');
-  }
-
   void _handlePause() {
     _logger.log('Reader: ⏸️ _handlePause() llamado', level: LogLevel.info);
     debugPrint('⏸️ Reader: _handlePause() llamado');
     final provider = Provider.of<AppProvider>(context, listen: false);
+    
+    // Detener animación del cursor PERO mantener cursor visible en última posición
     _stopCursorAnimation();
     
-    // Guardar posición exacta para resume
+    // Guardar posición exacta para resume - cursor en última palabra pronunciada
     _logger.log('Reader: Guardando posición - página: $_currentPage, char: $_currentCharIndex', level: LogLevel.info);
     debugPrint('⏸️ Reader: Guardando posición - página: $_currentPage, char: $_currentCharIndex');
     provider.setPausedText(_currentPageText, _currentCharIndex);
@@ -371,9 +310,11 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
     
     setState(() {
       _isPaused = true;
+      // Mantener _currentCharIndex donde quedó (última palabra leída)
+      // El cursor permanece visible mostrando esa posición
     });
-    _logger.log('Reader: ✅ Pausado - estado guardado', level: LogLevel.success);
-    debugPrint('⏸️ Reader: Pausado - estado guardado');
+    _logger.log('Reader: ✅ Pausado - cursor visible en posición $_currentCharIndex', level: LogLevel.success);
+    debugPrint('⏸️ Reader: Pausado - cursor permanece visible en posición $_currentCharIndex');
   }
   
   Future<void> _handlePlayOrResume() async {
@@ -543,7 +484,6 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
             isTranslating: context.watch<AppProvider>().isTranslating,
             onPlay: _handlePlayOrResume,
             onPause: _handlePause,
-            onStop: _handleStop,
             onTranslate: _translateAndRead,
             onAddBookmark: _addBookmark,
             onChangeVoice: _showVoiceSelector,
@@ -565,15 +505,17 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
           onPageChanged: _onPageChanged,
         ),
         
-        // Capa 2: Captura SOLO doble tap, permite scroll/zoom del PDF
+        // Capa 2: Captura tap simple para colocar cursor, permite scroll/zoom del PDF
         if (_currentPageText.isNotEmpty)
           Positioned.fill(
-            child: GestureDetector(
-              behavior: HitTestBehavior.translucent, // Permite pasar gestos de scroll
-              onDoubleTap: () {
-                _showPositionSelector();
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                return GestureDetector(
+                  behavior: HitTestBehavior.translucent, // Permite pasar gestos de scroll
+                  onTapDown: (details) => _onTextTap(details, constraints),
+                  // Importante: NO usar child Container para no bloquear eventos
+                );
               },
-              // Importante: NO usar child Container para no bloquear eventos
             ),
           ),
         
@@ -640,7 +582,7 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
                   ),
                   SizedBox(width: 8),
                   Text(
-                    'Doble tap para seleccionar desde dónde leer',
+                    'Toca el PDF para seleccionar desde dónde leer',
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 12,
