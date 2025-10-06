@@ -74,20 +74,22 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
     final provider = Provider.of<AppProvider>(context, listen: false);
     provider.updateProgress(widget.book.id, _currentPage - 1, widget.book.totalPages);
     
-    _loadCurrentPageText();
+    // NO recargar texto si estamos reproduciendo (evita interrupciones)
+    if (!provider.isPlaying) {
+      _loadCurrentPageText();
+    }
   }
 
   void _onTextTap(TapDownDetails details, BoxConstraints constraints) {
     if (_currentPageText.isEmpty) return;
     
-    // Detener cualquier reproducción en curso
+    // Si está reproduciendo, pausar LIMPIAMENTE sin efectos secundarios
     final provider = Provider.of<AppProvider>(context, listen: false);
-    if (provider.isPlaying) {
+    final wasPlaying = provider.isPlaying;
+    
+    if (wasPlaying) {
       _stopCursorAnimation();
       provider.pause();
-      setState(() {
-        _isPaused = true;
-      });
     }
     
     // Calcular posición aproximada en el texto basándose en dónde se tocó
@@ -101,7 +103,7 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
     setState(() {
       _selectedStartIndex = estimatedIndex;
       _currentCharIndex = estimatedIndex;
-      // NO reiniciar _isPaused aquí - mantener estado
+      _isPaused = wasPlaying; // Mantener estado de pausa solo si estaba reproduciendo
     });
     
     _logger.log('Reader: Cursor colocado en posición $estimatedIndex (${(relativePosition * 100).toInt()}%)', level: LogLevel.info);
@@ -110,9 +112,9 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
     ScaffoldMessenger.of(context).clearSnackBars();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('✓ Cursor posicionado en ${(relativePosition * 100).toInt()}% del texto'),
-        duration: const Duration(milliseconds: 800),
-        backgroundColor: Theme.of(context).primaryColor,
+        content: Text('✓ Cursor en ${(relativePosition * 100).toInt()}% del texto'),
+        duration: const Duration(milliseconds: 600),
+        backgroundColor: Theme.of(context).primaryColor.withOpacity(0.8),
       ),
     );
   }
@@ -508,14 +510,18 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
         // Capa 2: Captura tap simple para colocar cursor, permite scroll/zoom del PDF
         if (_currentPageText.isNotEmpty)
           Positioned.fill(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                return GestureDetector(
-                  behavior: HitTestBehavior.translucent, // Permite pasar gestos de scroll
-                  onTapDown: (details) => _onTextTap(details, constraints),
-                  // Importante: NO usar child Container para no bloquear eventos
-                );
-              },
+            child: IgnorePointer( // <-- NUEVO: Ignora puntero excepto para taps
+              ignoring: false,
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  return GestureDetector(
+                    behavior: HitTestBehavior.translucent,
+                    onTapDown: (details) => _onTextTap(details, constraints),
+                    // Importante: NO bloquear otros gestos (scroll, zoom)
+                    child: Container(color: Colors.transparent), // Necesario para detectar taps en toda el área
+                  );
+                },
+              ),
             ),
           ),
         
@@ -524,75 +530,80 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
           bottom: 16,
           left: 0,
           right: 0,
-          child: Center(
-            child: Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 8,
-              ),
-              decoration: BoxDecoration(
-                color: Colors.black87,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(
-                    Icons.picture_as_pdf,
-                    color: Colors.white,
-                    size: 16,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Página $_currentPage de ${widget.book.totalPages}',
-                    style: const TextStyle(
+          child: IgnorePointer( // <-- NUEVO: No bloquear gestos del PDF
+            child: Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.black87,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.picture_as_pdf,
                       color: Colors.white,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
+                      size: 16,
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 8),
+                    Text(
+                      'Página $_currentPage de ${widget.book.totalPages}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
         ),
         
-        // Hint para el usuario
-        Positioned(
-          top: 16,
-          left: 0,
-          right: 0,
-          child: Center(
-            child: Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 8,
-              ),
-              decoration: BoxDecoration(
-                color: Theme.of(context).primaryColor.withOpacity(0.9),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.touch_app,
-                    color: Colors.white,
-                    size: 16,
+        // Hint para el usuario (solo aparece si no está reproduciendo)
+        if (!context.watch<AppProvider>().isPlaying && !_isPaused)
+          Positioned(
+            top: 16,
+            left: 0,
+            right: 0,
+            child: IgnorePointer( // <-- NUEVO: No bloquear gestos del PDF
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
                   ),
-                  SizedBox(width: 8),
-                  Text(
-                    'Toca el PDF para seleccionar desde dónde leer',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                    ),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).primaryColor.withOpacity(0.85),
+                    borderRadius: BorderRadius.circular(20),
                   ),
-                ],
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.touch_app,
+                        color: Colors.white,
+                        size: 16,
+                      ),
+                      SizedBox(width: 8),
+                      Text(
+                        'Toca el PDF para seleccionar desde dónde leer',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
           ),
-        ),
         
         // Indicador de carga
         if (_isLoadingText)
