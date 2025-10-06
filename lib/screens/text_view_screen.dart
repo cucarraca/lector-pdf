@@ -28,6 +28,11 @@ class _TextViewScreenState extends State<TextViewScreen> {
   List<String> _allPagesText = [];
   bool _isLoading = true;
   bool _isPaused = false;
+  
+  // Para seguir el progreso durante reproducción
+  Timer? _progressTimer;
+  int _startCursorPosition = 0;
+  DateTime? _startTime;
 
   @override
   void initState() {
@@ -89,20 +94,88 @@ class _TextViewScreenState extends State<TextViewScreen> {
     if (currentText.isEmpty) return;
     
     final textToRead = currentText.substring(startIndex);
+    
+    // Iniciar tracking de progreso
+    _startCursorPosition = startIndex;
+    _startTime = DateTime.now();
+    _startProgressTracking();
+    
     await provider.speak(textToRead);
     
-    // Si terminó y hay más páginas, continuar
-    if (startIndex == 0 && _currentPage < widget.book.totalPages) {
-      _pageController.nextPage(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-      );
+    // Detener tracking
+    _stopProgressTracking();
+    
+    // LECTURA CONTINUA: Si terminó la página y empezó desde el inicio, avanzar
+    if (startIndex == 0 && !_isPaused && _currentPage < widget.book.totalPages && mounted) {
+      final isStillPlaying = Provider.of<AppProvider>(context, listen: false).isPlaying;
+      
+      if (!isStillPlaying) {
+        // Avanzar a siguiente página y continuar leyendo
+        _currentPage++;
+        _pageController.jumpToPage(_currentPage - 1);
+        
+        // Esperar a que se actualice la página
+        await Future.delayed(const Duration(milliseconds: 500));
+        
+        // Resetear cursor al inicio de la nueva página
+        if (mounted && _currentPage <= widget.book.totalPages) {
+          _textController.text = _allPagesText[_currentPage - 1];
+          _textController.selection = const TextSelection.collapsed(offset: 0);
+          
+          // Continuar leyendo si no se pausó
+          if (!_isPaused) {
+            await _readFromCursor();
+          }
+        }
+      }
     }
+  }
+  
+  void _startProgressTracking() {
+    _progressTimer?.cancel();
+    
+    // Actualizar cursor cada 200ms para simular progreso
+    _progressTimer = Timer.periodic(const Duration(milliseconds: 200), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      
+      // Calcular posición aproximada basada en tiempo
+      final provider = Provider.of<AppProvider>(context, listen: false);
+      if (!provider.isPlaying) {
+        timer.cancel();
+        return;
+      }
+      
+      final elapsed = DateTime.now().difference(_startTime!).inMilliseconds;
+      final speed = provider.ttsService.speechRate;
+      final charsPerMs = (16.0 * speed) / 1000; // ~16 chars/sec
+      final charsRead = (elapsed * charsPerMs).toInt();
+      final newPosition = (_startCursorPosition + charsRead).clamp(0, _textController.text.length);
+      
+      if (mounted) {
+        setState(() {
+          _textController.selection = TextSelection.collapsed(offset: newPosition);
+        });
+      }
+    });
+  }
+  
+  void _stopProgressTracking() {
+    _progressTimer?.cancel();
+    _progressTimer = null;
   }
 
   void _handlePause() {
     final provider = Provider.of<AppProvider>(context, listen: false);
+    
+    // Detener tracking de progreso
+    _stopProgressTracking();
+    
+    // El cursor ya está en la posición correcta gracias al tracking
     final cursorPosition = _textController.selection.baseOffset;
+    
     provider.setPausedText(_textController.text, cursorPosition >= 0 ? cursorPosition : 0);
     provider.pause();
     setState(() => _isPaused = true);
@@ -161,14 +234,20 @@ class _TextViewScreenState extends State<TextViewScreen> {
               itemCount: _allPagesText.length,
               onPageChanged: _onPageChanged,
               itemBuilder: (context, index) {
+                final isCurrentPage = index == _currentPage - 1;
                 return Container(
                   color: Colors.white,
                   padding: const EdgeInsets.all(16),
                   child: SingleChildScrollView(
+                    // IMPORTANTE: scroll vertical dentro de cada página
+                    physics: const AlwaysScrollableScrollPhysics(),
                     child: TextField(
-                      controller: index == _currentPage - 1 ? _textController : TextEditingController(text: _allPagesText[index]),
-                      focusNode: index == _currentPage - 1 ? _textFocusNode : null,
+                      controller: isCurrentPage 
+                          ? _textController 
+                          : TextEditingController(text: _allPagesText[index]),
+                      focusNode: isCurrentPage ? _textFocusNode : null,
                       maxLines: null,
+                      keyboardType: TextInputType.multiline,
                       style: const TextStyle(
                         fontSize: 16,
                         height: 1.5,
@@ -179,8 +258,7 @@ class _TextViewScreenState extends State<TextViewScreen> {
                         contentPadding: EdgeInsets.zero,
                       ),
                       onTap: () {
-                        // Focus en el campo para mover cursor
-                        if (index == _currentPage - 1) {
+                        if (isCurrentPage) {
                           _textFocusNode.requestFocus();
                         }
                       },
@@ -223,6 +301,7 @@ class _TextViewScreenState extends State<TextViewScreen> {
 
   @override
   void dispose() {
+    _stopProgressTracking();
     _textController.dispose();
     _textFocusNode.dispose();
     _pageController.dispose();
