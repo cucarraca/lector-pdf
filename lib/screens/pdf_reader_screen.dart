@@ -35,6 +35,8 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
   
   // Para el cursor animado
   Timer? _cursorTimer;
+  Timer? _cursorBlinkTimer;
+  bool _cursorBlinkOn = true;
   int _currentCharIndex = 0;
 
   @override
@@ -120,6 +122,14 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
   }
 
   void _startCursorAnimation() {
+    // Iniciar parpadeo visible del cursor
+    _cursorBlinkTimer?.cancel();
+    _cursorBlinkOn = true;
+    _cursorBlinkTimer = Timer.periodic(const Duration(milliseconds: 500), (_) {
+      if (mounted) {
+        setState(() { _cursorBlinkOn = !_cursorBlinkOn; });
+      }
+    });
     _stopCursorAnimation();
     
     final provider = Provider.of<AppProvider>(context, listen: false);
@@ -157,6 +167,7 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
   void _stopCursorAnimation() {
     _cursorTimer?.cancel();
     _cursorTimer = null;
+    _cursorBlinkTimer?.cancel();
   }
 
   Future<void> _readCurrentPage() async {
@@ -511,24 +522,44 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
           onPageChanged: _onPageChanged,
         ),
         
-        // Capa 2: Captura tap simple para colocar cursor, permite scroll/zoom del PDF
+        // Capa 2: Captura tap simple para colocar cursor SIN bloquear scroll/zoom
         if (_currentPageText.isNotEmpty)
           Positioned.fill(
-            child: IgnorePointer( // <-- NUEVO: Ignora puntero excepto para taps
-              ignoring: false,
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  return GestureDetector(
-                    behavior: HitTestBehavior.translucent,
-                    onTapDown: (details) => _onTextTap(details, constraints),
-                    // Importante: NO bloquear otros gestos (scroll, zoom)
-                    child: Container(color: Colors.transparent), // Necesario para detectar taps en toda el área
-                  );
-                },
-              ),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                return Listener(
+                  behavior: HitTestBehavior.deferToChild,
+                  onPointerDown: (evt) {
+                    if (evt.kind == PointerDeviceKind.touch) {
+                      // Solo registrar tap corto: convertimos a TapDown manual aproximado
+                      final details = TapDownDetails(
+                        localPosition: evt.localPosition,
+                      );
+                      _onTextTap(details, constraints);
+                    }
+                  },
+                  child: IgnorePointer(
+                    ignoring: true, // No consume gestos de scroll del visor PDF
+                    child: Container(color: Colors.transparent),
+                  ),
+                );
+              },
             ),
           ),
         
+        // Cursor visible dibujado sobre el PDF
+        if (_currentPageText.isNotEmpty)
+          Positioned.fill(
+            child: IgnorePointer(
+              child: CustomPaint(
+                painter: _CursorPainter(
+                  text: _currentPageText,
+                  charIndex: _currentCharIndex.clamp(0, _currentPageText.length - 1),
+                  visible: _cursorBlinkOn || context.watch<AppProvider>().isPlaying == true,
+                ),
+              ),
+            ),
+          ),
         // Indicador de página
         Positioned(
           bottom: 16,
@@ -607,6 +638,31 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
                 ),
               ),
             ),
+
+class _CursorPainter extends CustomPainter {
+  final String text;
+  final int charIndex;
+  final bool visible;
+  _CursorPainter({required this.text, required this.charIndex, required this.visible});
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (!visible) return;
+    if (text.isEmpty) return;
+    // Aproximación: colocar cursor vertical según proporción del índice dentro del texto
+    final ratio = text.isEmpty ? 0.0 : (charIndex / text.length).clamp(0.0, 1.0);
+    final y = ratio * size.height;
+    final paint = Paint()
+      ..color = const Color(0xFFE91E63)
+      ..strokeWidth = 2.0
+      ..style = PaintingStyle.stroke;
+    canvas.drawLine(Offset(size.width * 0.02, y), Offset(size.width * 0.12, y), paint);
+  }
+  @override
+  bool shouldRepaint(covariant _CursorPainter old) {
+    return old.charIndex != charIndex || old.visible != visible || old.text != text;
+  }
+}
+
           ),
         
         // Indicador de carga
