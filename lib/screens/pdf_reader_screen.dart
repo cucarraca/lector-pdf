@@ -212,20 +212,24 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
       debugPrint('📖 Reader: Página actual: $_currentPage, total: ${widget.book.totalPages}');
       debugPrint('📖 Reader: Mounted: $mounted');
       
-      // Si terminó de leer la página completa y hay más páginas, continuar con la siguiente
-      if (startIndex == 0 && _currentPage < widget.book.totalPages && mounted) {
+      // Avance automático de página SOLO si:
+      // 1) Se empezó a leer desde el inicio de la página (startIndex == 0)
+      // 2) NO está en pausa (_isPaused == false)
+      // 3) Se llegó (o prácticamente llegó) al final del texto (_currentCharIndex >= length - 2)
+      // 4) Hay más páginas y el widget sigue montado
+      if (startIndex == 0 && !_isPaused && _currentCharIndex >= _currentPageText.length - 2 && _currentPage < widget.book.totalPages && mounted) {
         final isStillPlaying = Provider.of<AppProvider>(context, listen: false).isPlaying;
         debugPrint('📖 Reader: isStillPlaying después de speak: $isStillPlaying');
         
         if (!isStillPlaying) {
-          _logger.log('Reader: ✅ Avanzando a siguiente página...', level: LogLevel.success);
-          debugPrint('✅ Reader: Avanzando a siguiente página...');
+          _logger.log('Reader: ✅ Avanzando a siguiente página (fin de página alcanzado)', level: LogLevel.success);
+          debugPrint('✅ Reader: Avanzando a siguiente página (fin de página alcanzado)');
           await _goToNextPageAndContinueReading();
         } else {
-          debugPrint('⚠️ Reader: No avanza porque isPlaying=true (extraño)');
+          debugPrint('⚠️ Reader: No avanza porque isPlaying=true (estado inesperado)');
         }
       } else {
-        debugPrint('📖 Reader: NO avanza - startIndex: $startIndex, página: $_currentPage/${widget.book.totalPages}');
+        debugPrint('📖 Reader: NO avanza - startIndex: $startIndex, paused: $_isPaused, char: $_currentCharIndex/${_currentPageText.length}, página: $_currentPage/${widget.book.totalPages}');
       }
     } finally {
       _isReading = false;
