@@ -82,13 +82,17 @@ class TtsService {
       return;
     }
     
-    // CRÍTICO: Asegurar que el motor esté limpio antes de hablar
+    // CRÍTICO: Asegurar que el motor esté completamente detenido
     _logger.log('TTS: 🧹 Limpiando estado previo...', level: LogLevel.debug);
     debugPrint('🧹 TTS: Limpiando estado previo...');
     await _flutterTts.stop();
+    _isPlaying = false;
+    _isPaused = false;
+    _speechCompleter?.complete();
+    _speechCompleter = null;
     
-    // Delay de seguridad para que el motor TTS se estabilice
-    await Future.delayed(const Duration(milliseconds: 200));
+    // Delay más largo para estabilización
+    await Future.delayed(const Duration(milliseconds: 500));
     
     _logger.log('TTS: 🎤 Iniciando reproducción de ${text.length} caracteres', level: LogLevel.info);
     debugPrint('🎤 TTS: Iniciando reproducción de ${text.length} caracteres');
@@ -99,51 +103,88 @@ class TtsService {
     // Crear un completer para esperar a que termine realmente
     _speechCompleter = Completer<void>();
     
-    final result = await _flutterTts.speak(text);
-    _logger.log('TTS: speak() retornó: $result', level: LogLevel.debug);
-    debugPrint('🎤 TTS: speak() retornó: $result');
-    
-    if (result == 1) {
-      _logger.log('TTS: ✅ Comando speak ejecutado exitosamente', level: LogLevel.success);
-      debugPrint('✅ TTS: Comando speak ejecutado exitosamente');
-      _isPlaying = true;
-      // Esperar a que complete realmente
-      try {
-        await _speechCompleter!.future;
+    try {
+      final result = await _flutterTts.speak(text);
+      _logger.log('TTS: speak() retornó: $result', level: LogLevel.debug);
+      debugPrint('🎤 TTS: speak() retornó: $result');
+      
+      if (result == 1) {
+        _logger.log('TTS: ✅ Comando speak ejecutado exitosamente', level: LogLevel.success);
+        debugPrint('✅ TTS: Comando speak ejecutado exitosamente');
+        _isPlaying = true;
+        // Esperar a que complete realmente
+        await _speechCompleter!.future.timeout(
+          Duration(seconds: (text.length / 10).ceil() + 30),
+          onTimeout: () {
+            _logger.log('TTS: ⏱️ Timeout en reproducción', level: LogLevel.warning);
+            debugPrint('⏱️ TTS: Timeout en reproducción');
+          },
+        );
         _logger.log('TTS: ✅ Reproducción finalizada completamente', level: LogLevel.success);
         debugPrint('✅ TTS: Reproducción finalizada completamente');
-      } catch (e) {
-        _logger.log('TTS: ⚠️ Reproducción interrumpida: $e', level: LogLevel.warning);
-        debugPrint('⚠️ TTS: Reproducción interrumpida: $e');
+      } else {
+        _logger.log('TTS: ❌ Error al ejecutar speak, código: $result', level: LogLevel.error);
+        debugPrint('❌ TTS: Error al ejecutar speak, código: $result');
+        _speechCompleter?.complete();
       }
-    } else {
-      _logger.log('TTS: ❌ Error al ejecutar speak, código: $result', level: LogLevel.error);
-      debugPrint('❌ TTS: Error al ejecutar speak, código: $result');
+    } catch (e) {
+      _logger.log('TTS: ⚠️ Excepción en speak: $e', level: LogLevel.error);
+      debugPrint('⚠️ TTS: Excepción en speak: $e');
       _speechCompleter?.complete();
+      _isPlaying = false;
     }
   }
 
   Future<void> pause() async {
+    if (!_isPlaying) {
+      _logger.log('TTS: ⚠️ No se puede pausar - no está reproduciendo', level: LogLevel.warning);
+      debugPrint('⚠️ TTS: No se puede pausar - no está reproduciendo');
+      return;
+    }
+    
     _logger.log('TTS: ⏸️ Pausando reproducción', level: LogLevel.info);
     debugPrint('⏸️ TTS: Pausando reproducción');
-    await _flutterTts.stop();
-    _isPaused = true;
-    _isPlaying = false;
-    _logger.log('TTS: ⏸️ Pausado - posición guardada: $_pausedPosition', level: LogLevel.info);
-    debugPrint('⏸️ TTS: Pausado - posición guardada: $_pausedPosition');
+    
+    try {
+      await _flutterTts.stop();
+      await Future.delayed(const Duration(milliseconds: 300));
+      _isPaused = true;
+      _isPlaying = false;
+      _speechCompleter?.complete();
+      _logger.log('TTS: ⏸️ Pausado - posición guardada: $_pausedPosition', level: LogLevel.info);
+      debugPrint('⏸️ TTS: Pausado - posición guardada: $_pausedPosition');
+    } catch (e) {
+      _logger.log('TTS: ❌ Error al pausar: $e', level: LogLevel.error);
+      debugPrint('❌ TTS: Error al pausar: $e');
+    }
   }
 
   Future<void> resume() async {
     _logger.log('TTS: ▶️ Reanudando desde posición $_pausedPosition', level: LogLevel.info);
     debugPrint('▶️ TTS: Reanudando desde posición $_pausedPosition');
-    if (_isPaused && _pausedText.isNotEmpty) {
-      _isPaused = false;
-      
+    
+    if (!_isPaused) {
+      _logger.log('TTS: ⚠️ No se puede resumir - no está pausado', level: LogLevel.warning);
+      debugPrint('⚠️ TTS: No se puede resumir - no está pausado');
+      return;
+    }
+    
+    if (_pausedText.isEmpty) {
+      _logger.log('TTS: ⚠️ No se puede resumir - texto vacío', level: LogLevel.warning);
+      debugPrint('⚠️ TTS: No se puede resumir - texto vacío');
+      return;
+    }
+    
+    _isPaused = false;
+    
+    try {
       // CRÍTICO: Limpiar estado antes de resumir
       _logger.log('TTS: 🧹 Limpiando estado previo...', level: LogLevel.debug);
       debugPrint('🧹 TTS: Limpiando estado previo...');
       await _flutterTts.stop();
-      await Future.delayed(const Duration(milliseconds: 200));
+      _speechCompleter?.complete();
+      _speechCompleter = null;
+      await Future.delayed(const Duration(milliseconds: 500));
       
       // Crear nuevo completer
       _speechCompleter = Completer<void>();
@@ -158,18 +199,21 @@ class TtsService {
       
       if (result == 1) {
         _isPlaying = true;
-        try {
-          await _speechCompleter!.future;
-          _logger.log('TTS: ✅ Resume completado', level: LogLevel.success);
-          debugPrint('✅ TTS: Resume completado');
-        } catch (e) {
-          _logger.log('TTS: ⚠️ Resume interrumpido: $e', level: LogLevel.warning);
-          debugPrint('⚠️ TTS: Resume interrumpido: $e');
-        }
+        await _speechCompleter!.future.timeout(
+          Duration(seconds: (textToSpeak.length / 10).ceil() + 30),
+          onTimeout: () {
+            _logger.log('TTS: ⏱️ Timeout en resume', level: LogLevel.warning);
+            debugPrint('⏱️ TTS: Timeout en resume');
+          },
+        );
+        _logger.log('TTS: ✅ Resume completado', level: LogLevel.success);
+        debugPrint('✅ TTS: Resume completado');
       }
-    } else {
-      _logger.log('TTS: ⚠️ No se puede resumir - isPaused: $_isPaused, texto vacío: ${_pausedText.isEmpty}', level: LogLevel.warning);
-      debugPrint('⚠️ TTS: No se puede resumir - isPaused: $_isPaused, texto vacío: ${_pausedText.isEmpty}');
+    } catch (e) {
+      _logger.log('TTS: ⚠️ Excepción en resume: $e', level: LogLevel.error);
+      debugPrint('⚠️ TTS: Excepción en resume: $e');
+      _speechCompleter?.complete();
+      _isPlaying = false;
     }
   }
 
@@ -183,14 +227,22 @@ class TtsService {
   Future<void> stop() async {
     _logger.log('TTS: ⏹️ Deteniendo reproducción', level: LogLevel.info);
     debugPrint('⏹️ TTS: Deteniendo reproducción');
-    await _flutterTts.stop();
-    _isPlaying = false;
-    _isPaused = false;
-    _pausedText = '';
-    _pausedPosition = 0;
-    _speechCompleter?.complete();
-    _logger.log('TTS: ⏹️ Detenido completamente', level: LogLevel.info);
-    debugPrint('⏹️ TTS: Detenido completamente');
+    
+    try {
+      await _flutterTts.stop();
+      await Future.delayed(const Duration(milliseconds: 300));
+      _isPlaying = false;
+      _isPaused = false;
+      _pausedText = '';
+      _pausedPosition = 0;
+      _speechCompleter?.complete();
+      _speechCompleter = null;
+      _logger.log('TTS: ⏹️ Detenido completamente', level: LogLevel.info);
+      debugPrint('⏹️ TTS: Detenido completamente');
+    } catch (e) {
+      _logger.log('TTS: ❌ Error al detener: $e', level: LogLevel.error);
+      debugPrint('❌ TTS: Error al detener: $e');
+    }
   }
 
   Future<void> setRate(double rate) async {

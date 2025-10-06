@@ -28,6 +28,7 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
   String _currentPageText = '';
   bool _isLoadingText = false;
   bool _isPaused = false;
+  bool _isReading = false; // NUEVO: Evitar múltiples lecturas simultáneas
   
   // Para la selección de texto en el overlay
   int _selectedStartIndex = 0;
@@ -219,60 +220,75 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
   }
 
   Future<void> _readCurrentPage() async {
-    _logger.log('Reader: 📖 _readCurrentPage() iniciado - página $_currentPage', level: LogLevel.info);
-    debugPrint('📖 Reader: _readCurrentPage() iniciado - página $_currentPage');
-    _logger.log('Reader: Texto disponible: ${_currentPageText.length} caracteres', level: LogLevel.info);
-    debugPrint('📖 Reader: Texto disponible: ${_currentPageText.length} caracteres');
-    debugPrint('📖 Reader: StartIndex: $_selectedStartIndex');
-    
-    if (_currentPageText.isEmpty) {
-      _logger.log('Reader: ⚠️ Texto vacío, no se puede leer', level: LogLevel.warning);
-      debugPrint('⚠️ Reader: Texto vacío, no se puede leer');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No hay texto para leer en esta página')),
-      );
+    // Evitar múltiples llamadas simultáneas
+    if (_isReading) {
+      _logger.log('Reader: ⚠️ Ya hay una lectura en progreso, ignorando', level: LogLevel.warning);
+      debugPrint('⚠️ Reader: Ya hay una lectura en progreso, ignorando');
       return;
     }
-
-    final provider = Provider.of<AppProvider>(context, listen: false);
     
-    // Leer desde la posición seleccionada
-    final startIndex = _selectedStartIndex.clamp(0, _currentPageText.length);
-    final textToRead = _currentPageText.substring(startIndex);
+    _isReading = true;
     
-    debugPrint('📖 Reader: Texto a leer: ${textToRead.length} caracteres desde posición $startIndex');
-    
-    // Iniciar animación del cursor
-    _startCursorAnimation();
-    
-    _logger.log('Reader: Llamando a provider.speak()...', level: LogLevel.info);
-    debugPrint('📖 Reader: Llamando a provider.speak()...');
-    await provider.speak(textToRead);
-    _logger.log('Reader: ✅ provider.speak() completado', level: LogLevel.success);
-    debugPrint('📖 Reader: provider.speak() completado');
-    
-    // Detener animación cuando termine
-    _stopCursorAnimation();
-    
-    debugPrint('📖 Reader: Verificando si debe continuar a siguiente página');
-    debugPrint('📖 Reader: StartIndex era 0: ${startIndex == 0}');
-    debugPrint('📖 Reader: Página actual: $_currentPage, total: ${widget.book.totalPages}');
-    debugPrint('📖 Reader: Mounted: $mounted');
-    
-    // Si terminó de leer la página completa y hay más páginas, continuar con la siguiente
-    if (startIndex == 0 && _currentPage < widget.book.totalPages && mounted) {
-      final isStillPlaying = Provider.of<AppProvider>(context, listen: false).isPlaying;
-      debugPrint('📖 Reader: isStillPlaying después de speak: $isStillPlaying');
+    try {
+      _logger.log('Reader: 📖 _readCurrentPage() iniciado - página $_currentPage', level: LogLevel.info);
+      debugPrint('📖 Reader: _readCurrentPage() iniciado - página $_currentPage');
+      _logger.log('Reader: Texto disponible: ${_currentPageText.length} caracteres', level: LogLevel.info);
+      debugPrint('📖 Reader: Texto disponible: ${_currentPageText.length} caracteres');
+      debugPrint('📖 Reader: StartIndex: $_selectedStartIndex');
       
-      if (!isStillPlaying) {
-        _logger.log('Reader: ✅ Avanzando a siguiente página...', level: LogLevel.success);
-        debugPrint('✅ Reader: Avanzando a siguiente página...');
-        await _goToNextPageAndContinueReading();
-      } else {
-        debugPrint('⚠️ Reader: No avanza porque isPlaying=true (extraño)');
+      if (_currentPageText.isEmpty) {
+        _logger.log('Reader: ⚠️ Texto vacío, no se puede leer', level: LogLevel.warning);
+        debugPrint('⚠️ Reader: Texto vacío, no se puede leer');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No hay texto para leer en esta página')),
+          );
+        }
+        return;
       }
-    } else {
-      debugPrint('📖 Reader: NO avanza - startIndex: $startIndex, página: $_currentPage/${widget.book.totalPages}');
+
+      final provider = Provider.of<AppProvider>(context, listen: false);
+      
+      // Leer desde la posición seleccionada
+      final startIndex = _selectedStartIndex.clamp(0, _currentPageText.length);
+      final textToRead = _currentPageText.substring(startIndex);
+      
+      debugPrint('📖 Reader: Texto a leer: ${textToRead.length} caracteres desde posición $startIndex');
+      
+      // Iniciar animación del cursor
+      _startCursorAnimation();
+      
+      _logger.log('Reader: Llamando a provider.speak()...', level: LogLevel.info);
+      debugPrint('📖 Reader: Llamando a provider.speak()...');
+      await provider.speak(textToRead);
+      _logger.log('Reader: ✅ provider.speak() completado', level: LogLevel.success);
+      debugPrint('📖 Reader: provider.speak() completado');
+      
+      // Detener animación cuando termine
+      _stopCursorAnimation();
+      
+      debugPrint('📖 Reader: Verificando si debe continuar a siguiente página');
+      debugPrint('📖 Reader: StartIndex era 0: ${startIndex == 0}');
+      debugPrint('📖 Reader: Página actual: $_currentPage, total: ${widget.book.totalPages}');
+      debugPrint('📖 Reader: Mounted: $mounted');
+      
+      // Si terminó de leer la página completa y hay más páginas, continuar con la siguiente
+      if (startIndex == 0 && _currentPage < widget.book.totalPages && mounted) {
+        final isStillPlaying = Provider.of<AppProvider>(context, listen: false).isPlaying;
+        debugPrint('📖 Reader: isStillPlaying después de speak: $isStillPlaying');
+        
+        if (!isStillPlaying) {
+          _logger.log('Reader: ✅ Avanzando a siguiente página...', level: LogLevel.success);
+          debugPrint('✅ Reader: Avanzando a siguiente página...');
+          await _goToNextPageAndContinueReading();
+        } else {
+          debugPrint('⚠️ Reader: No avanza porque isPlaying=true (extraño)');
+        }
+      } else {
+        debugPrint('📖 Reader: NO avanza - startIndex: $startIndex, página: $_currentPage/${widget.book.totalPages}');
+      }
+    } finally {
+      _isReading = false;
     }
   }
   
@@ -332,6 +348,7 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
     debugPrint('⏹️ Reader: _handleStop() llamado');
     final provider = Provider.of<AppProvider>(context, listen: false);
     _stopCursorAnimation();
+    _isReading = false; // IMPORTANTE: Resetear flag de lectura
     provider.stop();
     
     setState(() {
