@@ -85,14 +85,24 @@ class TtsService {
     // CRÍTICO: Asegurar que el motor esté completamente detenido
     _logger.log('TTS: 🧹 Limpiando estado previo...', level: LogLevel.debug);
     debugPrint('🧹 TTS: Limpiando estado previo...');
-    await _flutterTts.stop();
+    
+    try {
+      await _flutterTts.stop();
+    } catch (e) {
+      _logger.log('TTS: ⚠️ Error al detener antes de speak: $e', level: LogLevel.warning);
+    }
+    
     _isPlaying = false;
     _isPaused = false;
-    _speechCompleter?.complete();
+    
+    // Completar SOLO si no está ya completado
+    if (_speechCompleter != null && !_speechCompleter!.isCompleted) {
+      _speechCompleter!.complete();
+    }
     _speechCompleter = null;
     
     // Delay más largo para estabilización
-    await Future.delayed(const Duration(milliseconds: 500));
+    await Future.delayed(const Duration(milliseconds: 800));
     
     _logger.log('TTS: 🎤 Iniciando reproducción de ${text.length} caracteres', level: LogLevel.info);
     debugPrint('🎤 TTS: Iniciando reproducción de ${text.length} caracteres');
@@ -112,25 +122,32 @@ class TtsService {
         _logger.log('TTS: ✅ Comando speak ejecutado exitosamente', level: LogLevel.success);
         debugPrint('✅ TTS: Comando speak ejecutado exitosamente');
         _isPlaying = true;
-        // Esperar a que complete realmente
-        await _speechCompleter!.future.timeout(
-          Duration(seconds: (text.length / 10).ceil() + 30),
-          onTimeout: () {
-            _logger.log('TTS: ⏱️ Timeout en reproducción', level: LogLevel.warning);
-            debugPrint('⏱️ TTS: Timeout en reproducción');
-          },
-        );
+        
+        // Esperar a que complete realmente con timeout dinámico
+        try {
+          await _speechCompleter!.future.timeout(
+            Duration(seconds: (text.length / 10).ceil() + 30),
+          );
+        } on TimeoutException {
+          _logger.log('TTS: ⏱️ Timeout en reproducción', level: LogLevel.warning);
+          debugPrint('⏱️ TTS: Timeout en reproducción');
+        }
+        
         _logger.log('TTS: ✅ Reproducción finalizada completamente', level: LogLevel.success);
         debugPrint('✅ TTS: Reproducción finalizada completamente');
       } else {
         _logger.log('TTS: ❌ Error al ejecutar speak, código: $result', level: LogLevel.error);
         debugPrint('❌ TTS: Error al ejecutar speak, código: $result');
-        _speechCompleter?.complete();
+        if (!_speechCompleter!.isCompleted) {
+          _speechCompleter!.complete();
+        }
       }
     } catch (e) {
       _logger.log('TTS: ⚠️ Excepción en speak: $e', level: LogLevel.error);
       debugPrint('⚠️ TTS: Excepción en speak: $e');
-      _speechCompleter?.complete();
+      if (_speechCompleter != null && !_speechCompleter!.isCompleted) {
+        _speechCompleter!.complete();
+      }
       _isPlaying = false;
     }
   }
@@ -150,7 +167,12 @@ class TtsService {
       await Future.delayed(const Duration(milliseconds: 300));
       _isPaused = true;
       _isPlaying = false;
-      _speechCompleter?.complete();
+      
+      // Completar SOLO si no está ya completado
+      if (_speechCompleter != null && !_speechCompleter!.isCompleted) {
+        _speechCompleter!.complete();
+      }
+      
       _logger.log('TTS: ⏸️ Pausado - posición guardada: $_pausedPosition', level: LogLevel.info);
       debugPrint('⏸️ TTS: Pausado - posición guardada: $_pausedPosition');
     } catch (e) {
@@ -181,10 +203,20 @@ class TtsService {
       // CRÍTICO: Limpiar estado antes de resumir
       _logger.log('TTS: 🧹 Limpiando estado previo...', level: LogLevel.debug);
       debugPrint('🧹 TTS: Limpiando estado previo...');
-      await _flutterTts.stop();
-      _speechCompleter?.complete();
+      
+      try {
+        await _flutterTts.stop();
+      } catch (e) {
+        _logger.log('TTS: ⚠️ Error al detener antes de resume: $e', level: LogLevel.warning);
+      }
+      
+      // Completar SOLO si no está ya completado
+      if (_speechCompleter != null && !_speechCompleter!.isCompleted) {
+        _speechCompleter!.complete();
+      }
       _speechCompleter = null;
-      await Future.delayed(const Duration(milliseconds: 500));
+      
+      await Future.delayed(const Duration(milliseconds: 800));
       
       // Crear nuevo completer
       _speechCompleter = Completer<void>();
@@ -199,20 +231,25 @@ class TtsService {
       
       if (result == 1) {
         _isPlaying = true;
-        await _speechCompleter!.future.timeout(
-          Duration(seconds: (textToSpeak.length / 10).ceil() + 30),
-          onTimeout: () {
-            _logger.log('TTS: ⏱️ Timeout en resume', level: LogLevel.warning);
-            debugPrint('⏱️ TTS: Timeout en resume');
-          },
-        );
+        
+        try {
+          await _speechCompleter!.future.timeout(
+            Duration(seconds: (textToSpeak.length / 10).ceil() + 30),
+          );
+        } on TimeoutException {
+          _logger.log('TTS: ⏱️ Timeout en resume', level: LogLevel.warning);
+          debugPrint('⏱️ TTS: Timeout en resume');
+        }
+        
         _logger.log('TTS: ✅ Resume completado', level: LogLevel.success);
         debugPrint('✅ TTS: Resume completado');
       }
     } catch (e) {
       _logger.log('TTS: ⚠️ Excepción en resume: $e', level: LogLevel.error);
       debugPrint('⚠️ TTS: Excepción en resume: $e');
-      _speechCompleter?.complete();
+      if (_speechCompleter != null && !_speechCompleter!.isCompleted) {
+        _speechCompleter!.complete();
+      }
       _isPlaying = false;
     }
   }
@@ -235,8 +272,13 @@ class TtsService {
       _isPaused = false;
       _pausedText = '';
       _pausedPosition = 0;
-      _speechCompleter?.complete();
+      
+      // Completar SOLO si no está ya completado
+      if (_speechCompleter != null && !_speechCompleter!.isCompleted) {
+        _speechCompleter!.complete();
+      }
       _speechCompleter = null;
+      
       _logger.log('TTS: ⏹️ Detenido completamente', level: LogLevel.info);
       debugPrint('⏹️ TTS: Detenido completamente');
     } catch (e) {
