@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:provider/provider.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 import '../models/pdf_book.dart';
@@ -122,15 +123,13 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
   }
 
   void _startCursorAnimation() {
+    _stopCursorAnimation(); // limpiar timers previos primero
     // Iniciar parpadeo visible del cursor
-    _cursorBlinkTimer?.cancel();
     _cursorBlinkOn = true;
-    _cursorBlinkTimer = Timer.periodic(const Duration(milliseconds: 500), (_) {
-      if (mounted) {
-        setState(() { _cursorBlinkOn = !_cursorBlinkOn; });
-      }
+    _cursorBlinkTimer = Timer.periodic(const Duration(milliseconds: 550), (_) {
+      if (!mounted) return;
+      setState(() { _cursorBlinkOn = !_cursorBlinkOn; });
     });
-    _stopCursorAnimation();
     
     final provider = Provider.of<AppProvider>(context, listen: false);
     
