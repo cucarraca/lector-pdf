@@ -3,7 +3,9 @@ import 'package:provider/provider.dart';
 import '../providers/app_provider.dart';
 import '../widgets/library_grid.dart';
 import '../widgets/theme_selector.dart';
+import '../services/log_service.dart';
 import 'add_pdf_screen.dart';
+import 'logs_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -14,6 +16,53 @@ class HomeScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Lector PDF'),
         actions: [
+          // Botón de Logs con badge
+          ValueListenableBuilder<int>(
+            valueListenable: LogService().logCountNotifier,
+            builder: (context, logCount, child) {
+              return Stack(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.bug_report),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const LogsScreen(),
+                        ),
+                      );
+                    },
+                    tooltip: 'Ver logs de debug',
+                  ),
+                  if (logCount > 0)
+                    Positioned(
+                      right: 8,
+                      top: 8,
+                      child: Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: BoxDecoration(
+                          color: Colors.red,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        constraints: const BoxConstraints(
+                          minWidth: 16,
+                          minHeight: 16,
+                        ),
+                        child: Text(
+                          logCount > 99 ? '99+' : '$logCount',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.palette),
             onPressed: () {

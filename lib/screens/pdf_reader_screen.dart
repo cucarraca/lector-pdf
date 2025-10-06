@@ -5,8 +5,10 @@ import 'package:provider/provider.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 import '../models/pdf_book.dart';
 import '../providers/app_provider.dart';
+import '../services/log_service.dart';
 import '../widgets/reader_controls.dart';
 import '../widgets/bookmarks_drawer.dart';
+import 'logs_screen.dart';
 
 class PdfReaderScreen extends StatefulWidget {
   final PdfBook book;
@@ -20,6 +22,7 @@ class PdfReaderScreen extends StatefulWidget {
 class _PdfReaderScreenState extends State<PdfReaderScreen> {
   final PdfViewerController _pdfViewerController = PdfViewerController();
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  final LogService _logger = LogService();
   
   int _currentPage = 1;
   String _currentPageText = '';
@@ -216,11 +219,14 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
   }
 
   Future<void> _readCurrentPage() async {
+    _logger.log('Reader: 📖 _readCurrentPage() iniciado - página $_currentPage', level: LogLevel.info);
     debugPrint('📖 Reader: _readCurrentPage() iniciado - página $_currentPage');
+    _logger.log('Reader: Texto disponible: ${_currentPageText.length} caracteres', level: LogLevel.info);
     debugPrint('📖 Reader: Texto disponible: ${_currentPageText.length} caracteres');
     debugPrint('📖 Reader: StartIndex: $_selectedStartIndex');
     
     if (_currentPageText.isEmpty) {
+      _logger.log('Reader: ⚠️ Texto vacío, no se puede leer', level: LogLevel.warning);
       debugPrint('⚠️ Reader: Texto vacío, no se puede leer');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No hay texto para leer en esta página')),
@@ -239,8 +245,10 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
     // Iniciar animación del cursor
     _startCursorAnimation();
     
+    _logger.log('Reader: Llamando a provider.speak()...', level: LogLevel.info);
     debugPrint('📖 Reader: Llamando a provider.speak()...');
     await provider.speak(textToRead);
+    _logger.log('Reader: ✅ provider.speak() completado', level: LogLevel.success);
     debugPrint('📖 Reader: provider.speak() completado');
     
     // Detener animación cuando termine
@@ -257,6 +265,7 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
       debugPrint('📖 Reader: isStillPlaying después de speak: $isStillPlaying');
       
       if (!isStillPlaying) {
+        _logger.log('Reader: ✅ Avanzando a siguiente página...', level: LogLevel.success);
         debugPrint('✅ Reader: Avanzando a siguiente página...');
         await _goToNextPageAndContinueReading();
       } else {
@@ -332,11 +341,13 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
   }
 
   void _handlePause() {
+    _logger.log('Reader: ⏸️ _handlePause() llamado', level: LogLevel.info);
     debugPrint('⏸️ Reader: _handlePause() llamado');
     final provider = Provider.of<AppProvider>(context, listen: false);
     _stopCursorAnimation();
     
     // Guardar posición exacta para resume
+    _logger.log('Reader: Guardando posición - página: $_currentPage, char: $_currentCharIndex', level: LogLevel.info);
     debugPrint('⏸️ Reader: Guardando posición - página: $_currentPage, char: $_currentCharIndex');
     provider.setPausedText(_currentPageText, _currentCharIndex);
     provider.pause();
@@ -344,23 +355,28 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
     setState(() {
       _isPaused = true;
     });
+    _logger.log('Reader: ✅ Pausado - estado guardado', level: LogLevel.success);
     debugPrint('⏸️ Reader: Pausado - estado guardado');
   }
   
   Future<void> _handlePlayOrResume() async {
+    _logger.log('Reader: ▶️ _handlePlayOrResume() llamado - isPaused: $_isPaused', level: LogLevel.info);
     debugPrint('▶️ Reader: _handlePlayOrResume() llamado - isPaused: $_isPaused');
     if (_isPaused) {
       // Reanudar desde donde se pausó
+      _logger.log('Reader: Modo RESUME', level: LogLevel.info);
       debugPrint('▶️ Reader: Modo RESUME');
       await _handleResume();
     } else {
       // Iniciar lectura normal
+      _logger.log('Reader: Modo PLAY normal', level: LogLevel.info);
       debugPrint('▶️ Reader: Modo PLAY normal');
       await _readCurrentPage();
     }
   }
   
   Future<void> _handleResume() async {
+    _logger.log('Reader: ▶️ _handleResume() iniciado', level: LogLevel.info);
     debugPrint('▶️ Reader: _handleResume() iniciado');
     final provider = Provider.of<AppProvider>(context, listen: false);
     
@@ -368,6 +384,7 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
       _isPaused = false;
     });
     
+    _logger.log('Reader: Llamando a provider.resume()...', level: LogLevel.info);
     debugPrint('▶️ Reader: Llamando a provider.resume()...');
     
     // Continuar desde la posición guardada
@@ -468,6 +485,19 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
       appBar: AppBar(
         title: Text(widget.book.title),
         actions: [
+          // Botón de logs
+          IconButton(
+            icon: const Icon(Icons.bug_report),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const LogsScreen(),
+                ),
+              );
+            },
+            tooltip: 'Ver logs de debug',
+          ),
           IconButton(
             icon: const Icon(Icons.bookmark),
             onPressed: () {

@@ -1,9 +1,11 @@
 import 'package:flutter_tts/flutter_tts.dart';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import './log_service.dart';
 
 class TtsService {
   final FlutterTts _flutterTts = FlutterTts();
+  final LogService _logger = LogService();
   bool _isPlaying = false;
   bool _isPaused = false;
   double _speechRate = 0.5;
@@ -19,12 +21,14 @@ class TtsService {
   }
 
   Future<void> _initTts() async {
+    _logger.log('TTS: Inicializando servicio TTS', level: LogLevel.debug);
     debugPrint('🔧 TTS: Inicializando servicio TTS');
     await _flutterTts.setLanguage("es-ES");
     await _flutterTts.setSpeechRate(_speechRate);
     await _flutterTts.setPitch(_pitch);
     
     _availableVoices = await _flutterTts.getVoices ?? [];
+    _logger.log('TTS: ${_availableVoices.length} voces disponibles', level: LogLevel.debug);
     debugPrint('🔧 TTS: ${_availableVoices.length} voces disponibles');
     
     if (_availableVoices.isNotEmpty) {
@@ -32,6 +36,7 @@ class TtsService {
         if (voice['name'].toString().contains('es')) {
           _currentVoice = voice['name'];
           await _flutterTts.setVoice({"name": voice['name'], "locale": voice['locale']});
+          _logger.log('TTS: Voz seleccionada: $_currentVoice', level: LogLevel.debug);
           debugPrint('🔧 TTS: Voz seleccionada: $_currentVoice');
           break;
         }
@@ -39,12 +44,14 @@ class TtsService {
     }
 
     _flutterTts.setStartHandler(() {
+      _logger.log('TTS: ▶️ Reproducción iniciada', level: LogLevel.info);
       debugPrint('▶️ TTS: Reproducción iniciada');
       _isPlaying = true;
       _isPaused = false;
     });
 
     _flutterTts.setCompletionHandler(() {
+      _logger.log('TTS: ✅ Reproducción completada', level: LogLevel.success);
       debugPrint('✅ TTS: Reproducción completada');
       _isPlaying = false;
       _isPaused = false;
@@ -52,6 +59,7 @@ class TtsService {
     });
 
     _flutterTts.setErrorHandler((msg) {
+      _logger.log('TTS: ❌ Error: $msg', level: LogLevel.error);
       debugPrint('❌ TTS: Error: $msg');
       _isPlaying = false;
       _isPaused = false;
@@ -59,6 +67,7 @@ class TtsService {
     });
     
     _flutterTts.setCancelHandler(() {
+      _logger.log('TTS: ⏹️ Reproducción cancelada', level: LogLevel.warning);
       debugPrint('⏹️ TTS: Reproducción cancelada');
       _isPlaying = false;
       _isPaused = false;
@@ -68,10 +77,12 @@ class TtsService {
 
   Future<void> speak(String text) async {
     if (text.isEmpty) {
+      _logger.log('TTS: ⚠️ Texto vacío, no se puede reproducir', level: LogLevel.warning);
       debugPrint('⚠️ TTS: Texto vacío, no se puede reproducir');
       return;
     }
     
+    _logger.log('TTS: 🎤 Iniciando reproducción de ${text.length} caracteres', level: LogLevel.info);
     debugPrint('🎤 TTS: Iniciando reproducción de ${text.length} caracteres');
     _pausedText = text;
     _pausedPosition = 0;
@@ -81,28 +92,35 @@ class TtsService {
     _speechCompleter = Completer<void>();
     
     final result = await _flutterTts.speak(text);
+    _logger.log('TTS: speak() retornó: $result', level: LogLevel.debug);
     debugPrint('🎤 TTS: speak() retornó: $result');
     
     if (result == 1) {
+      _logger.log('TTS: ✅ Comando speak ejecutado exitosamente', level: LogLevel.success);
       debugPrint('✅ TTS: Comando speak ejecutado exitosamente');
       _isPlaying = true;
       // Esperar a que complete realmente
       await _speechCompleter!.future;
+      _logger.log('TTS: ✅ Reproducción finalizada completamente', level: LogLevel.success);
       debugPrint('✅ TTS: Reproducción finalizada completamente');
     } else {
+      _logger.log('TTS: ❌ Error al ejecutar speak, código: $result', level: LogLevel.error);
       debugPrint('❌ TTS: Error al ejecutar speak, código: $result');
     }
   }
 
   Future<void> pause() async {
+    _logger.log('TTS: ⏸️ Pausando reproducción', level: LogLevel.info);
     debugPrint('⏸️ TTS: Pausando reproducción');
     await _flutterTts.stop();
     _isPaused = true;
     _isPlaying = false;
+    _logger.log('TTS: ⏸️ Pausado - posición guardada: $_pausedPosition', level: LogLevel.info);
     debugPrint('⏸️ TTS: Pausado - posición guardada: $_pausedPosition');
   }
 
   Future<void> resume() async {
+    _logger.log('TTS: ▶️ Reanudando desde posición $_pausedPosition', level: LogLevel.info);
     debugPrint('▶️ TTS: Reanudando desde posición $_pausedPosition');
     if (_isPaused && _pausedText.isNotEmpty) {
       _isPaused = false;
@@ -111,17 +129,21 @@ class TtsService {
       _speechCompleter = Completer<void>();
       
       final textToSpeak = _pausedText.substring(_pausedPosition);
+      _logger.log('TTS: ▶️ Reproduciendo ${textToSpeak.length} caracteres restantes', level: LogLevel.info);
       debugPrint('▶️ TTS: Reproduciendo ${textToSpeak.length} caracteres restantes');
       
       final result = await _flutterTts.speak(textToSpeak);
+      _logger.log('TTS: resume speak() retornó: $result', level: LogLevel.debug);
       debugPrint('▶️ TTS: resume speak() retornó: $result');
       
       if (result == 1) {
         _isPlaying = true;
         await _speechCompleter!.future;
+        _logger.log('TTS: ✅ Resume completado', level: LogLevel.success);
         debugPrint('✅ TTS: Resume completado');
       }
     } else {
+      _logger.log('TTS: ⚠️ No se puede resumir - isPaused: $_isPaused, texto vacío: ${_pausedText.isEmpty}', level: LogLevel.warning);
       debugPrint('⚠️ TTS: No se puede resumir - isPaused: $_isPaused, texto vacío: ${_pausedText.isEmpty}');
     }
   }
@@ -129,10 +151,12 @@ class TtsService {
   void setPausedText(String text, int position) {
     _pausedText = text;
     _pausedPosition = position;
+    _logger.log('TTS: 💾 Posición guardada: $position de ${text.length} caracteres', level: LogLevel.debug);
     debugPrint('💾 TTS: Posición guardada: $position de ${text.length} caracteres');
   }
 
   Future<void> stop() async {
+    _logger.log('TTS: ⏹️ Deteniendo reproducción', level: LogLevel.info);
     debugPrint('⏹️ TTS: Deteniendo reproducción');
     await _flutterTts.stop();
     _isPlaying = false;
@@ -140,6 +164,7 @@ class TtsService {
     _pausedText = '';
     _pausedPosition = 0;
     _speechCompleter?.complete();
+    _logger.log('TTS: ⏹️ Detenido completamente', level: LogLevel.info);
     debugPrint('⏹️ TTS: Detenido completamente');
   }
 
