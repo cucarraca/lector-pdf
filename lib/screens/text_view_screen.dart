@@ -245,33 +245,39 @@ class _TextViewScreenState extends State<TextViewScreen> {
       ),
       body: Stack(
         children: [
-          // Texto con scroll vertical
+          // Texto con scroll vertical nativo (igual que PDF)
           Column(
             children: [
               Expanded(
                 child: Container(
                   color: Colors.white,
                   padding: const EdgeInsets.all(16),
-                  child: SingleChildScrollView(
+                  child: Scrollbar(
                     controller: _scrollController,
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    child: TextField(
-                      controller: _textController,
-                      focusNode: _textFocusNode,
-                      maxLines: null,
-                      keyboardType: TextInputType.multiline,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        height: 1.5,
-                        color: Colors.black87,
+                    thumbVisibility: false, // Solo visible al hacer scroll
+                    thickness: 6.0,
+                    radius: const Radius.circular(3),
+                    child: SingleChildScrollView(
+                      controller: _scrollController,
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      child: TextField(
+                        controller: _textController,
+                        focusNode: _textFocusNode,
+                        maxLines: null,
+                        keyboardType: TextInputType.multiline,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          height: 1.5,
+                          color: Colors.black87,
+                        ),
+                        decoration: const InputDecoration(
+                          border: InputBorder.none,
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                        onTap: () {
+                          _textFocusNode.requestFocus();
+                        },
                       ),
-                      decoration: const InputDecoration(
-                        border: InputBorder.none,
-                        contentPadding: EdgeInsets.zero,
-                      ),
-                      onTap: () {
-                        _textFocusNode.requestFocus();
-                      },
                     ),
                   ),
                 ),
