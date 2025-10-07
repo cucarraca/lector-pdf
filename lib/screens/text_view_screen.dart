@@ -243,74 +243,104 @@ class _TextViewScreenState extends State<TextViewScreen> {
           ),
         ],
       ),
-      body: Column(
+      body: Stack(
         children: [
-          Expanded(
-            child: Container(
-              color: Colors.white,
-              padding: const EdgeInsets.all(16),
-              child: SingleChildScrollView(
-                controller: _scrollController,
-                physics: const AlwaysScrollableScrollPhysics(),
-                child: TextField(
-                  controller: _textController,
-                  focusNode: _textFocusNode,
-                  maxLines: null,
-                  keyboardType: TextInputType.multiline,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    height: 1.5,
+          // Texto con scroll vertical
+          Column(
+            children: [
+              Expanded(
+                child: Container(
+                  color: Colors.white,
+                  padding: const EdgeInsets.all(16),
+                  child: SingleChildScrollView(
+                    controller: _scrollController,
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    child: TextField(
+                      controller: _textController,
+                      focusNode: _textFocusNode,
+                      maxLines: null,
+                      keyboardType: TextInputType.multiline,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        height: 1.5,
+                        color: Colors.black87,
+                      ),
+                      decoration: const InputDecoration(
+                        border: InputBorder.none,
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                      onTap: () {
+                        _textFocusNode.requestFocus();
+                      },
+                    ),
+                  ),
+                ),
+              ),
+              // Controles
+              ReaderControls(
+                isPlaying: context.watch<AppProvider>().isPlaying,
+                isTranslating: context.watch<AppProvider>().isTranslating,
+                onPlay: _handlePlayOrResume,
+                onPause: _handlePause,
+                onTranslate: () {},
+                onAddBookmark: () {},
+                onChangeVoice: () {},
+                currentPage: _currentPage,
+                totalPages: widget.book.totalPages,
+              ),
+            ],
+          ),
+          // Indicador de página flotante (igual que PDF)
+          Positioned(
+            bottom: 80, // Arriba de los controles
+            left: 0,
+            right: 0,
+            child: IgnorePointer(
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
                     color: Colors.black87,
+                    borderRadius: BorderRadius.circular(20),
                   ),
-                  decoration: const InputDecoration(
-                    border: InputBorder.none,
-                    contentPadding: EdgeInsets.zero,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.arrow_back, color: Colors.white, size: 20),
+                        onPressed: _currentPage > 1 ? _goToPreviousPage : null,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                      const SizedBox(width: 12),
+                      const Icon(
+                        Icons.picture_as_pdf,
+                        color: Colors.white,
+                        size: 16,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Página $_currentPage de ${widget.book.totalPages}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      IconButton(
+                        icon: const Icon(Icons.arrow_forward, color: Colors.white, size: 20),
+                        onPressed: _currentPage < widget.book.totalPages ? _goToNextPage : null,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                    ],
                   ),
-                  onTap: () {
-                    _textFocusNode.requestFocus();
-                  },
                 ),
               ),
             ),
-          ),
-          // Navegación de páginas
-          Container(
-            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-            color: Colors.grey[200],
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.arrow_back),
-                  onPressed: _currentPage > 1 ? _goToPreviousPage : null,
-                  tooltip: 'Página anterior',
-                ),
-                Text(
-                  'Página $_currentPage de ${widget.book.totalPages}',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.arrow_forward),
-                  onPressed: _currentPage < widget.book.totalPages ? _goToNextPage : null,
-                  tooltip: 'Página siguiente',
-                ),
-              ],
-            ),
-          ),
-          // Controles
-          ReaderControls(
-            isPlaying: context.watch<AppProvider>().isPlaying,
-            isTranslating: context.watch<AppProvider>().isTranslating,
-            onPlay: _handlePlayOrResume,
-            onPause: _handlePause,
-            onTranslate: () {}, // No implementado en vista texto
-            onAddBookmark: () {}, // No implementado en vista texto
-            onChangeVoice: () {}, // No implementado en vista texto
-            currentPage: _currentPage,
-            totalPages: widget.book.totalPages,
           ),
         ],
       ),
