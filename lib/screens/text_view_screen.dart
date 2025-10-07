@@ -308,6 +308,60 @@ class _TextViewScreenState extends State<TextViewScreen> {
       appBar: AppBar(
         title: Text('${widget.book.title} (Texto)'),
         actions: [
+          // Botón de versión
+          IconButton(
+            icon: const Icon(Icons.info_outline),
+            onPressed: () {
+              showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Row(
+                    children: [
+                      Icon(Icons.check_circle, color: Colors.green),
+                      SizedBox(width: 8),
+                      Text('Versión Modificada'),
+                    ],
+                  ),
+                  content: const Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Lector PDF - Versión Mejorada',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                      SizedBox(height: 16),
+                      Text('✅ Scroll mejorado en vista texto'),
+                      SizedBox(height: 8),
+                      Text('✅ Navegación de páginas unificada'),
+                      SizedBox(height: 8),
+                      Text('✅ Indicador flotante interactivo'),
+                      SizedBox(height: 8),
+                      Text('✅ Diálogo "Go to page"'),
+                      SizedBox(height: 16),
+                      Text(
+                        'Compilado: 2025',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey,
+                        ),
+                      ),
+                    ],
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('OK'),
+                    ),
+                  ],
+                ),
+              );
+            },
+            tooltip: 'Info de versión',
+          ),
           IconButton(
             icon: const Icon(Icons.picture_as_pdf),
             onPressed: () {
