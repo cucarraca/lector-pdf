@@ -209,6 +209,81 @@ class _TextViewScreenState extends State<TextViewScreen> {
     }
   }
 
+  void _showGoToPageDialog() {
+    final TextEditingController pageController = TextEditingController();
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Go to page'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '1 - ${widget.book.totalPages}',
+              style: TextStyle(
+                color: Colors.grey[600],
+                fontSize: 14,
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: pageController,
+              keyboardType: TextInputType.number,
+              autofocus: true,
+              decoration: const InputDecoration(
+                hintText: 'Enter page number',
+                border: OutlineInputBorder(),
+              ),
+              onSubmitted: (value) {
+                final pageNumber = int.tryParse(value);
+                if (pageNumber != null && 
+                    pageNumber >= 1 && 
+                    pageNumber <= widget.book.totalPages) {
+                  Navigator.pop(context);
+                  setState(() {
+                    _currentPage = pageNumber;
+                    _updateTextForCurrentPage();
+                  });
+                  _scrollController.jumpTo(0);
+                  
+                  final provider = Provider.of<AppProvider>(context, listen: false);
+                  provider.updateProgress(widget.book.id, _currentPage - 1, widget.book.totalPages);
+                }
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('CANCEL'),
+          ),
+          TextButton(
+            onPressed: () {
+              final pageNumber = int.tryParse(pageController.text);
+              if (pageNumber != null && 
+                  pageNumber >= 1 && 
+                  pageNumber <= widget.book.totalPages) {
+                Navigator.pop(context);
+                setState(() {
+                  _currentPage = pageNumber;
+                  _updateTextForCurrentPage();
+                });
+                _scrollController.jumpTo(0);
+                
+                final provider = Provider.of<AppProvider>(context, listen: false);
+                provider.updateProgress(widget.book.id, _currentPage - 1, widget.book.totalPages);
+              }
+            },
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -243,53 +318,97 @@ class _TextViewScreenState extends State<TextViewScreen> {
           ),
         ],
       ),
-      body: Column(
+      body: Stack(
         children: [
-          Expanded(
-            child: Container(
-              color: Colors.white,
-              padding: const EdgeInsets.all(16),
-              child: Scrollbar(
-                controller: _scrollController,
-                thumbVisibility: true, // Siempre visible como en PDF
-                thickness: 8.0,
-                radius: const Radius.circular(4),
-                child: SingleChildScrollView(
-                  controller: _scrollController,
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  child: TextField(
-                    controller: _textController,
-                    focusNode: _textFocusNode,
-                    maxLines: null,
-                    keyboardType: TextInputType.multiline,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      height: 1.5,
-                      color: Colors.black87,
+          Column(
+            children: [
+              Expanded(
+                child: Container(
+                  color: Colors.white,
+                  padding: const EdgeInsets.all(16),
+                  child: Scrollbar(
+                    controller: _scrollController,
+                    thumbVisibility: true, // Siempre visible como en PDF
+                    thickness: 8.0,
+                    radius: const Radius.circular(4),
+                    child: SingleChildScrollView(
+                      controller: _scrollController,
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      child: TextField(
+                        controller: _textController,
+                        focusNode: _textFocusNode,
+                        maxLines: null,
+                        keyboardType: TextInputType.multiline,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          height: 1.5,
+                          color: Colors.black87,
+                        ),
+                        decoration: const InputDecoration(
+                          border: InputBorder.none,
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                        onTap: () {
+                          _textFocusNode.requestFocus();
+                        },
+                      ),
                     ),
-                    decoration: const InputDecoration(
-                      border: InputBorder.none,
-                      contentPadding: EdgeInsets.zero,
-                    ),
-                    onTap: () {
-                      _textFocusNode.requestFocus();
-                    },
+                  ),
+                ),
+              ),
+              // Controles
+              ReaderControls(
+                isPlaying: context.watch<AppProvider>().isPlaying,
+                isTranslating: context.watch<AppProvider>().isTranslating,
+                onPlay: _handlePlayOrResume,
+                onPause: _handlePause,
+                onTranslate: () {},
+                onAddBookmark: () {},
+                onChangeVoice: () {},
+                currentPage: _currentPage,
+                totalPages: widget.book.totalPages,
+              ),
+            ],
+          ),
+          // Indicador de página (igual que en PDF)
+          Positioned(
+            bottom: 16, // Misma posición que en PDF
+            left: 0,
+            right: 0,
+            child: Center(
+              child: GestureDetector(
+                onTap: _showGoToPageDialog,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.black87,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.picture_as_pdf,
+                        color: Colors.white,
+                        size: 16,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Página $_currentPage de ${widget.book.totalPages}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
             ),
-          ),
-          // Controles
-          ReaderControls(
-            isPlaying: context.watch<AppProvider>().isPlaying,
-            isTranslating: context.watch<AppProvider>().isTranslating,
-            onPlay: _handlePlayOrResume,
-            onPause: _handlePause,
-            onTranslate: () {},
-            onAddBookmark: () {},
-            onChangeVoice: () {},
-            currentPage: _currentPage,
-            totalPages: widget.book.totalPages,
           ),
         ],
       ),
