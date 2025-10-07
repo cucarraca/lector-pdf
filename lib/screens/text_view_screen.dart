@@ -8,11 +8,13 @@ import '../widgets/reader_controls.dart';
 class TextViewScreen extends StatefulWidget {
   final PdfBook book;
   final int initialPage;
+  final List<String>? cachedPages; // Recibir páginas cacheadas
   
   const TextViewScreen({
     super.key,
     required this.book,
     this.initialPage = 1,
+    this.cachedPages,
   });
 
   @override
@@ -22,7 +24,7 @@ class TextViewScreen extends StatefulWidget {
 class _TextViewScreenState extends State<TextViewScreen> {
   final TextEditingController _textController = TextEditingController();
   final FocusNode _textFocusNode = FocusNode();
-  final PageController _pageController = PageController();
+  final ScrollController _scrollController = ScrollController();
   
   int _currentPage = 1;
   List<String> _allPagesText = [];
@@ -38,7 +40,15 @@ class _TextViewScreenState extends State<TextViewScreen> {
   void initState() {
     super.initState();
     _currentPage = widget.initialPage;
-    _loadAllPages();
+    
+    // Si ya hay páginas cacheadas, usarlas
+    if (widget.cachedPages != null && widget.cachedPages!.isNotEmpty) {
+      _allPagesText = widget.cachedPages!;
+      _updateTextForCurrentPage();
+      setState(() => _isLoading = false);
+    } else {
+      _loadAllPages();
+    }
   }
 
   Future<void> _loadAllPages() async {
@@ -55,32 +65,43 @@ class _TextViewScreenState extends State<TextViewScreen> {
     }
     
     if (mounted) {
-      setState(() {
-        _isLoading = false;
-        if (_allPagesText.isNotEmpty) {
-          _textController.text = _allPagesText[_currentPage - 1];
-        }
-      });
-      
-      // Saltar a la página inicial
-      if (_currentPage > 1) {
-        Future.delayed(const Duration(milliseconds: 100), () {
-          _pageController.jumpToPage(_currentPage - 1);
-        });
-      }
+      _updateTextForCurrentPage();
+      setState(() => _isLoading = false);
     }
   }
-
-  void _onPageChanged(int page) {
-    setState(() {
-      _currentPage = page + 1;
-      if (page < _allPagesText.length) {
-        _textController.text = _allPagesText[page];
-      }
-    });
-    
-    final provider = Provider.of<AppProvider>(context, listen: false);
-    provider.updateProgress(widget.book.id, page, widget.book.totalPages);
+  
+  void _updateTextForCurrentPage() {
+    if (_currentPage > 0 && _currentPage <= _allPagesText.length) {
+      _textController.text = _allPagesText[_currentPage - 1];
+      // Resetear cursor al inicio de la página
+      _textController.selection = const TextSelection.collapsed(offset: 0);
+    }
+  }
+  
+  void _goToNextPage() {
+    if (_currentPage < widget.book.totalPages) {
+      setState(() {
+        _currentPage++;
+        _updateTextForCurrentPage();
+      });
+      _scrollController.jumpTo(0); // Volver arriba
+      
+      final provider = Provider.of<AppProvider>(context, listen: false);
+      provider.updateProgress(widget.book.id, _currentPage - 1, widget.book.totalPages);
+    }
+  }
+  
+  void _goToPreviousPage() {
+    if (_currentPage > 1) {
+      setState(() {
+        _currentPage--;
+        _updateTextForCurrentPage();
+      });
+      _scrollController.jumpTo(0); // Volver arriba
+      
+      final provider = Provider.of<AppProvider>(context, listen: false);
+      provider.updateProgress(widget.book.id, _currentPage - 1, widget.book.totalPages);
+    }
   }
 
   Future<void> _readFromCursor() async {
@@ -111,21 +132,14 @@ class _TextViewScreenState extends State<TextViewScreen> {
       
       if (!isStillPlaying) {
         // Avanzar a siguiente página y continuar leyendo
-        _currentPage++;
-        _pageController.jumpToPage(_currentPage - 1);
+        _goToNextPage();
         
-        // Esperar a que se actualice la página
+        // Esperar a que se actualice
         await Future.delayed(const Duration(milliseconds: 500));
         
-        // Resetear cursor al inicio de la nueva página
-        if (mounted && _currentPage <= widget.book.totalPages) {
-          _textController.text = _allPagesText[_currentPage - 1];
-          _textController.selection = const TextSelection.collapsed(offset: 0);
-          
-          // Continuar leyendo si no se pausó
-          if (!_isPaused) {
-            await _readFromCursor();
-          }
+        // Continuar leyendo si no se pausó
+        if (!_isPaused && mounted) {
+          await _readFromCursor();
         }
       }
     }
@@ -221,7 +235,10 @@ class _TextViewScreenState extends State<TextViewScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.picture_as_pdf),
-            onPressed: () => Navigator.pop(context),
+            onPressed: () {
+              // Devolver las páginas cacheadas para no recargar
+              Navigator.pop(context, _allPagesText);
+            },
             tooltip: 'Volver a vista PDF',
           ),
         ],
@@ -229,57 +246,58 @@ class _TextViewScreenState extends State<TextViewScreen> {
       body: Column(
         children: [
           Expanded(
-            child: PageView.builder(
-              controller: _pageController,
-              itemCount: _allPagesText.length,
-              onPageChanged: _onPageChanged,
-              itemBuilder: (context, index) {
-                final isCurrentPage = index == _currentPage - 1;
-                return Container(
-                  color: Colors.white,
-                  padding: const EdgeInsets.all(16),
-                  child: SingleChildScrollView(
-                    // IMPORTANTE: scroll vertical dentro de cada página
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    child: TextField(
-                      controller: isCurrentPage 
-                          ? _textController 
-                          : TextEditingController(text: _allPagesText[index]),
-                      focusNode: isCurrentPage ? _textFocusNode : null,
-                      maxLines: null,
-                      keyboardType: TextInputType.multiline,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        height: 1.5,
-                        color: Colors.black87,
-                      ),
-                      decoration: const InputDecoration(
-                        border: InputBorder.none,
-                        contentPadding: EdgeInsets.zero,
-                      ),
-                      onTap: () {
-                        if (isCurrentPage) {
-                          _textFocusNode.requestFocus();
-                        }
-                      },
-                    ),
+            child: Container(
+              color: Colors.white,
+              padding: const EdgeInsets.all(16),
+              child: SingleChildScrollView(
+                controller: _scrollController,
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: TextField(
+                  controller: _textController,
+                  focusNode: _textFocusNode,
+                  maxLines: null,
+                  keyboardType: TextInputType.multiline,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    height: 1.5,
+                    color: Colors.black87,
                   ),
-                );
-              },
-            ),
-          ),
-          // Indicador de página
-          Container(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            color: Colors.grey[200],
-            child: Center(
-              child: Text(
-                'Página $_currentPage de ${widget.book.totalPages}',
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
+                  decoration: const InputDecoration(
+                    border: InputBorder.none,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                  onTap: () {
+                    _textFocusNode.requestFocus();
+                  },
                 ),
               ),
+            ),
+          ),
+          // Navegación de páginas
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+            color: Colors.grey[200],
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.arrow_back),
+                  onPressed: _currentPage > 1 ? _goToPreviousPage : null,
+                  tooltip: 'Página anterior',
+                ),
+                Text(
+                  'Página $_currentPage de ${widget.book.totalPages}',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.arrow_forward),
+                  onPressed: _currentPage < widget.book.totalPages ? _goToNextPage : null,
+                  tooltip: 'Página siguiente',
+                ),
+              ],
             ),
           ),
           // Controles
@@ -304,7 +322,7 @@ class _TextViewScreenState extends State<TextViewScreen> {
     _stopProgressTracking();
     _textController.dispose();
     _textFocusNode.dispose();
-    _pageController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 }

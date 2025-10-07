@@ -30,7 +30,7 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
   String _currentPageText = '';
   bool _isLoadingText = false;
   bool _isPaused = false;
-  bool _isReading = false; // NUEVO: Evitar múltiples lecturas simultáneas
+  bool _isReading = false;
   
   // Para la selección de texto en el overlay
   int _selectedStartIndex = 0;
@@ -40,6 +40,9 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
   Timer? _cursorBlinkTimer;
   bool _cursorBlinkOn = true;
   int _currentCharIndex = 0;
+  
+  // Cache de páginas de texto
+  List<String>? _cachedTextPages;
 
   @override
   void initState() {
@@ -463,16 +466,22 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
           // Botón para cambiar a vista texto
           IconButton(
             icon: const Icon(Icons.text_fields),
-            onPressed: () {
-              Navigator.push(
+            onPressed: () async {
+              final result = await Navigator.push<List<String>>(
                 context,
                 MaterialPageRoute(
                   builder: (context) => TextViewScreen(
                     book: widget.book,
                     initialPage: _currentPage,
+                    cachedPages: _cachedTextPages, // Pasar cache
                   ),
                 ),
               );
+              
+              // Recibir el cache de vuelta
+              if (result != null) {
+                _cachedTextPages = result;
+              }
             },
             tooltip: 'Vista de texto',
           ),
