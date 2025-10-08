@@ -334,18 +334,29 @@ class _TextViewScreenState extends State<TextViewScreen> {
                         ),
                       ),
                       SizedBox(height: 16),
-                      Text('✅ Scroll mejorado en vista texto'),
+                      Text('✅ Sin scrollbar visible en texto'),
                       SizedBox(height: 8),
                       Text('✅ Navegación de páginas unificada'),
                       SizedBox(height: 8),
                       Text('✅ Indicador flotante interactivo'),
                       SizedBox(height: 8),
-                      Text('✅ Diálogo "Go to page"'),
+                      Text('✅ Diálogo "Go to page" en ambas vistas'),
+                      SizedBox(height: 8),
+                      Text('✅ Interfaz limpia y consistente'),
                       SizedBox(height: 16),
                       Text(
-                        'Compilado: 2025',
+                        'Versión: v18-scroll-limpio',
                         style: TextStyle(
                           fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blue,
+                        ),
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        'Compilado: Octubre 2025',
+                        style: TextStyle(
+                          fontSize: 11,
                           color: Colors.grey,
                         ),
                       ),
@@ -380,34 +391,29 @@ class _TextViewScreenState extends State<TextViewScreen> {
                 child: Container(
                   color: Colors.white,
                   padding: const EdgeInsets.all(16),
-                  child: Scrollbar(
+                  child: SingleChildScrollView(
                     controller: _scrollController,
-                    thumbVisibility: true, // Siempre visible como en PDF
-                    thickness: 8.0,
-                    radius: const Radius.circular(4),
-                    child: SingleChildScrollView(
-                      controller: _scrollController,
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      child: TextField(
-                        controller: _textController,
-                        focusNode: _textFocusNode,
-                        maxLines: null,
-                        keyboardType: TextInputType.multiline,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          height: 1.5,
-                          color: Colors.black87,
-                        ),
-                        decoration: const InputDecoration(
-                          border: InputBorder.none,
-                          contentPadding: EdgeInsets.zero,
-                        ),
-                        onTap: () {
-                          _textFocusNode.requestFocus();
-                        },
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    child: TextField(
+                      controller: _textController,
+                      focusNode: _textFocusNode,
+                      maxLines: null,
+                      keyboardType: TextInputType.multiline,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        height: 1.5,
+                        color: Colors.black87,
                       ),
+                      decoration: const InputDecoration(
+                        border: InputBorder.none,
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                      onTap: () {
+                        _textFocusNode.requestFocus();
+                      },
                     ),
                   ),
+                ),
                 ),
               ),
               // Controles
