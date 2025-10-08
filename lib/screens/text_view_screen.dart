@@ -414,7 +414,6 @@ class _TextViewScreenState extends State<TextViewScreen> {
                     ),
                   ),
                 ),
-                ),
               ),
               // Controles
               ReaderControls(
