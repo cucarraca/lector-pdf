@@ -49,14 +49,14 @@ jobs:
     
     - name: Rename APK with version
       run: |
-        VERSION="v18-scroll-limpio-cache"
+        VERSION="v19-minimalista"
         BUILD_NUM="${{ github.run_number }}"
         mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/lector-pdf-${VERSION}-build${BUILD_NUM}.apk
     
     - name: Upload APK to artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: lector-pdf-v18-scroll-limpio-cache
+        name: lector-pdf-v19-minimalista
         path: build/app/outputs/flutter-apk/lector-pdf-*.apk
         retention-days: 30
     
@@ -64,19 +64,25 @@ jobs:
       if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
       uses: softprops/action-gh-release@v1
       with:
-        tag_name: v18-build${{ github.run_number }}
-        name: Lector PDF v18 - Scroll Limpio + Caché - Build ${{ github.run_number }}
+        tag_name: v19-build${{ github.run_number }}
+        name: Lector PDF v19 - Interfaz Minimalista - Build ${{ github.run_number }}
         body: |
-          ## 📱 Lector PDF - Versión Mejorada v18
+          ## 📱 Lector PDF - Versión Minimalista v19
           
           ### ✅ Mejoras Implementadas:
-          - Sin scrollbar visible en vista texto
-          - Navegación de páginas unificada
-          - Indicador flotante interactivo (ambas vistas)
-          - Diálogo "Go to page" en ambas vistas
-          - Interfaz limpia y consistente
-          - **Caché de texto mejorado (instantáneo)**
-          - Indicadores idénticos en PDF y TEXTO
+          - ✨ **Interfaz limpia sin distracciones**
+          - ❌ Eliminados indicadores flotantes en PDF
+          - ❌ Eliminado hint superior en PDF
+          - ✅ Sin scrollbar visible en vista texto
+          - ✅ Navegación de páginas en ambas vistas
+          - ✅ Diálogo "Go to page" interactivo
+          - ✅ Caché de texto instantáneo
+          - ✅ Experiencia de lectura mejorada
+          
+          ### 🎯 Cambios en esta versión:
+          - Vista PDF completamente limpia (solo el PDF)
+          - Vista TEXTO con indicador flotante para navegación
+          - Interfaz minimalista y enfocada en la lectura
           
           ### 📦 Instalación:
           1. Descarga el APK

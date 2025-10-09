@@ -511,18 +511,20 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
                         ),
                       ),
                       SizedBox(height: 16),
-                      Text('✅ Sin scrollbar visible en texto'),
+                      Text('✨ Interfaz limpia sin distracciones'),
                       SizedBox(height: 8),
-                      Text('✅ Navegación de páginas unificada'),
+                      Text('✅ Vista PDF minimalista (solo PDF)'),
                       SizedBox(height: 8),
-                      Text('✅ Indicador flotante interactivo'),
+                      Text('✅ Sin indicadores flotantes en PDF'),
                       SizedBox(height: 8),
-                      Text('✅ Diálogo "Go to page" en ambas vistas'),
+                      Text('✅ Navegación por diálogo en TEXTO'),
                       SizedBox(height: 8),
-                      Text('✅ Interfaz limpia y consistente'),
+                      Text('✅ Caché de texto instantáneo'),
+                      SizedBox(height: 8),
+                      Text('✅ Experiencia de lectura optimizada'),
                       SizedBox(height: 16),
                       Text(
-                        'Versión: v18-scroll-limpio',
+                        'Versión: v19-minimalista',
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
@@ -634,86 +636,6 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
                   ),
                 );
               },
-            ),
-          ),
-        
-        // Indicador de página
-        Positioned(
-          bottom: 80,
-          left: 0,
-          right: 0,
-          child: IgnorePointer( // <-- NUEVO: No bloquear gestos del PDF
-            child: Center(
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.black87,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.picture_as_pdf,
-                      color: Colors.white,
-                      size: 16,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Página $_currentPage de ${widget.book.totalPages}',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-        
-        // Hint para el usuario (solo aparece si no está reproduciendo)
-        if (!context.watch<AppProvider>().isPlaying && !_isPaused)
-          Positioned(
-            top: 16,
-            left: 0,
-            right: 0,
-            child: IgnorePointer( // <-- NUEVO: No bloquear gestos del PDF
-              child: Center(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).primaryColor.withOpacity(0.85),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.touch_app,
-                        color: Colors.white,
-                        size: 16,
-                      ),
-                      SizedBox(width: 8),
-                      Text(
-                        'Toca el PDF para seleccionar desde dónde leer',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                        ),
-                      ),
-                                        ],
-                  ),
-                ),
-              ),
             ),
           ),
         
