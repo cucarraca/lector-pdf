@@ -307,6 +307,13 @@ class _TextViewScreenState extends State<TextViewScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text('${widget.book.title} (Texto)'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            // Devolver el cache al salir con el botón back
+            Navigator.pop(context, _allPagesText);
+          },
+        ),
         actions: [
           // Botón de versión
           IconButton(
@@ -429,9 +436,9 @@ class _TextViewScreenState extends State<TextViewScreen> {
               ),
             ],
           ),
-          // Indicador de página (igual que en PDF)
+          // Indicador de página (exactamente igual que en PDF)
           Positioned(
-            bottom: 80, // Arriba de los controles
+            bottom: 80,
             left: 0,
             right: 0,
             child: Center(

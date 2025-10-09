@@ -47,13 +47,44 @@ jobs:
         path: build/app/outputs/flutter-apk/app-release.apk
         retention-days: 30
     
+    - name: Rename APK with version
+      run: |
+        VERSION="v18-scroll-limpio-cache"
+        BUILD_NUM="${{ github.run_number }}"
+        mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/lector-pdf-${VERSION}-build${BUILD_NUM}.apk
+    
+    - name: Upload APK to artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: lector-pdf-v18-scroll-limpio-cache
+        path: build/app/outputs/flutter-apk/lector-pdf-*.apk
+        retention-days: 30
+    
     - name: Create Release
       if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
       uses: softprops/action-gh-release@v1
       with:
-        tag_name: v${{ github.run_number }}
-        name: Release v${{ github.run_number }}
-        files: build/app/outputs/flutter-apk/app-release.apk
+        tag_name: v18-build${{ github.run_number }}
+        name: Lector PDF v18 - Scroll Limpio + Caché - Build ${{ github.run_number }}
+        body: |
+          ## 📱 Lector PDF - Versión Mejorada v18
+          
+          ### ✅ Mejoras Implementadas:
+          - Sin scrollbar visible en vista texto
+          - Navegación de páginas unificada
+          - Indicador flotante interactivo (ambas vistas)
+          - Diálogo "Go to page" en ambas vistas
+          - Interfaz limpia y consistente
+          - **Caché de texto mejorado (instantáneo)**
+          - Indicadores idénticos en PDF y TEXTO
+          
+          ### 📦 Instalación:
+          1. Descarga el APK
+          2. Permite instalación de fuentes desconocidas
+          3. Instala la app
+          
+          **Compilado:** Octubre 2025
+        files: build/app/outputs/flutter-apk/lector-pdf-*.apk
         draft: false
         prerelease: false
       env:
