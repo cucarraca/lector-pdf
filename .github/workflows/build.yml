@@ -49,14 +49,14 @@ jobs:
     
     - name: Rename APK with version
       run: |
-        VERSION="v21-indicador-esquina"
+        VERSION="v22-paginacion-real"
         BUILD_NUM="${{ github.run_number }}"
         mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/lector-pdf-${VERSION}-build${BUILD_NUM}.apk
     
     - name: Upload APK to artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: lector-pdf-v21-indicador-esquina
+        name: lector-pdf-v22-paginacion-real
         path: build/app/outputs/flutter-apk/lector-pdf-*.apk
         retention-days: 30
     
@@ -64,26 +64,32 @@ jobs:
       if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
       uses: softprops/action-gh-release@v1
       with:
-        tag_name: v21-build${{ github.run_number }}
-        name: Lector PDF v21 - Indicador Esquina - Build ${{ github.run_number }}
+        tag_name: v22-build${{ github.run_number }}
+        name: Lector PDF v22 - Paginación Real - Build ${{ github.run_number }}
         body: |
-          ## 📱 Lector PDF - Versión con Indicador de Esquina v21
+          ## 📱 Lector PDF - Versión con Paginación Real v22
           
           ### ✅ Mejoras Implementadas:
-          - ✨ **Indicador de página en esquina superior derecha (TEXTO)**
+          - ✨ **Navegación con indicador arrastrable (slider vertical)**
+          - 🖱️ **Soporte para scroll con rueda del ratón**
+          - 📄 **Paginación real: 1 página PDF = 1 página texto**
+          - ✅ Carga lazy de páginas (solo se carga la página actual)
+          - ✅ Caché inteligente de páginas ya visitadas
+          - ✅ Indicador visual de página actual en el texto
           - ✅ Vista PDF completamente limpia
-          - ✅ Vista TEXTO con número de página flotante
-          - ✅ Tap en indicador abre diálogo "Go to page"
-          - ✅ Navegación rápida por controles inferiores
-          - ✅ Caché de texto instantáneo
-          - ✅ Experiencia de lectura optimizada
           
           ### 🎯 Cambios en esta versión:
-          - Vista PDF: Completamente limpia (solo PDF)
-          - Vista TEXTO: Con indicador flotante en esquina superior derecha
-          - Indicador muestra número de página actual
-          - Al tocar el indicador, se abre diálogo de navegación
-          - Diseño minimalista y funcional
+          - Vista TEXTO mantiene estructura de páginas del PDF original
+          - Scroll con rueda del ratón cambia de página
+          - Indicador arrastrable funciona como slider de navegación
+          - Carga optimizada: solo se extrae texto cuando visitas una página
+          - Cada página de texto corresponde exactamente a su página PDF
+          
+          ### 🎮 Controles:
+          - **Tap en indicador:** Abrir diálogo "Go to page"
+          - **Arrastrar indicador:** Navegar entre páginas (slider vertical)
+          - **Rueda del ratón:** Subir/bajar páginas
+          - **Controles inferiores:** Play, pause, navegación
           
           ### 📦 Instalación:
           1. Descarga el APK
