@@ -31,6 +31,9 @@ class _TextViewScreenState extends State<TextViewScreen> {
   bool _isLoading = true;
   bool _isPaused = false;
   
+  // Para el indicador arrastrable
+  double _indicatorY = 16.0;
+  
   // Para seguir el progreso durante reproducción
   Timer? _progressTimer;
   int _startCursorPosition = 0;
@@ -438,12 +441,19 @@ class _TextViewScreenState extends State<TextViewScreen> {
               ),
             ],
           ),
-          // Indicador de página flotante (esquina superior derecha)
+          // Indicador de página flotante (esquina superior derecha) - ARRASTRABLE
           Positioned(
-            top: 16,
+            top: _indicatorY,
             right: 16,
             child: GestureDetector(
               onTap: _showGoToPageDialog,
+              onVerticalDragUpdate: (details) {
+                setState(() {
+                  _indicatorY += details.delta.dy;
+                  // Limitar el rango de movimiento vertical
+                  _indicatorY = _indicatorY.clamp(16.0, MediaQuery.of(context).size.height - 100.0);
+                });
+              },
               child: Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 12,
