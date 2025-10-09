@@ -341,20 +341,20 @@ class _TextViewScreenState extends State<TextViewScreen> {
                         ),
                       ),
                       SizedBox(height: 16),
-                      Text('✨ Interfaz limpia sin distracciones'),
+                      Text('✨ Interfaz ultra limpia en ambas vistas'),
                       SizedBox(height: 8),
-                      Text('✅ Vista PDF minimalista (solo PDF)'),
+                      Text('❌ Sin indicadores flotantes'),
                       SizedBox(height: 8),
-                      Text('✅ Sin indicadores flotantes en PDF'),
+                      Text('✅ Solo contenido (PDF o TEXTO)'),
                       SizedBox(height: 8),
-                      Text('✅ Navegación por diálogo en TEXTO'),
+                      Text('✅ Navegación por controles inferiores'),
                       SizedBox(height: 8),
                       Text('✅ Caché de texto instantáneo'),
                       SizedBox(height: 8),
-                      Text('✅ Experiencia de lectura optimizada'),
+                      Text('✅ Experiencia inmersiva'),
                       SizedBox(height: 16),
                       Text(
-                        'Versión: v19-minimalista',
+                        'Versión: v20-ultra-limpio',
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
@@ -437,46 +437,6 @@ class _TextViewScreenState extends State<TextViewScreen> {
                 totalPages: widget.book.totalPages,
               ),
             ],
-          ),
-          // Indicador de página (exactamente igual que en PDF)
-          Positioned(
-            bottom: 80,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: GestureDetector(
-                onTap: _showGoToPageDialog,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.black87,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.picture_as_pdf,
-                        color: Colors.white,
-                        size: 16,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Página $_currentPage de ${widget.book.totalPages}',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
           ),
         ],
       ),
