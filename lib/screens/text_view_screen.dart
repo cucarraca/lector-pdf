@@ -441,7 +441,7 @@ class _TextViewScreenState extends State<TextViewScreen> {
               ),
             ],
           ),
-          // Indicador de página flotante (esquina superior derecha) - ARRASTRABLE
+          // Indicador de página flotante (esquina superior derecha) - NAVEGACIÓN POR ARRASTRE
           Positioned(
             top: _indicatorY,
             right: 16,
@@ -449,9 +449,44 @@ class _TextViewScreenState extends State<TextViewScreen> {
               onTap: _showGoToPageDialog,
               onVerticalDragUpdate: (details) {
                 setState(() {
+                  // Mover el indicador
                   _indicatorY += details.delta.dy;
-                  // Limitar el rango de movimiento vertical
-                  _indicatorY = _indicatorY.clamp(16.0, MediaQuery.of(context).size.height - 100.0);
+                  
+                  // Calcular área disponible para el desplazamiento
+                  final screenHeight = MediaQuery.of(context).size.height;
+                  final minY = 16.0;
+                  final maxY = screenHeight - 200.0; // Dejar espacio para controles
+                  final availableHeight = maxY - minY;
+                  
+                  // Limitar posición del indicador
+                  _indicatorY = _indicatorY.clamp(minY, maxY);
+                  
+                  // Calcular página basada en posición vertical (proporcional)
+                  final normalizedPosition = (_indicatorY - minY) / availableHeight;
+                  final newPage = (normalizedPosition * (widget.book.totalPages - 1) + 1).round();
+                  
+                  // Cambiar página si es diferente
+                  if (newPage != _currentPage && newPage >= 1 && newPage <= widget.book.totalPages) {
+                    _currentPage = newPage;
+                    _updateTextForCurrentPage();
+                    _scrollController.jumpTo(0);
+                    
+                    final provider = Provider.of<AppProvider>(context, listen: false);
+                    provider.updateProgress(widget.book.id, _currentPage - 1, widget.book.totalPages);
+                  }
+                });
+              },
+              onVerticalDragEnd: (details) {
+                // Al soltar, ajustar posición del indicador a la página actual
+                setState(() {
+                  final screenHeight = MediaQuery.of(context).size.height;
+                  final minY = 16.0;
+                  final maxY = screenHeight - 200.0;
+                  final availableHeight = maxY - minY;
+                  
+                  // Calcular posición Y basada en la página actual
+                  final pageProgress = (_currentPage - 1) / (widget.book.totalPages - 1);
+                  _indicatorY = minY + (pageProgress * availableHeight);
                 });
               },
               child: Container(
@@ -462,6 +497,13 @@ class _TextViewScreenState extends State<TextViewScreen> {
                 decoration: BoxDecoration(
                   color: Colors.black87,
                   borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
                 ),
                 child: Text(
                   '$_currentPage',
