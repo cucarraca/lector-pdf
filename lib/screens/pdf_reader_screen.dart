@@ -639,7 +639,7 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
         
         // Indicador de página
         Positioned(
-          bottom: 16,
+          bottom: 80,
           left: 0,
           right: 0,
           child: IgnorePointer( // <-- NUEVO: No bloquear gestos del PDF

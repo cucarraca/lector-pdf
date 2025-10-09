@@ -431,7 +431,7 @@ class _TextViewScreenState extends State<TextViewScreen> {
           ),
           // Indicador de página (igual que en PDF)
           Positioned(
-            bottom: 16, // Misma posición que en PDF
+            bottom: 80, // Arriba de los controles
             left: 0,
             right: 0,
             child: Center(
