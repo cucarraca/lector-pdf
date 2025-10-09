@@ -48,34 +48,10 @@ class _TextViewScreenState extends State<TextViewScreen> {
     // Si ya hay páginas cacheadas, usarlas
     if (widget.cachedPages != null && widget.cachedPages!.isNotEmpty) {
       _allPagesText = widget.cachedPages!;
-      _updateTextForCurrentPage();
+      _buildFullTextWithSeparators();
       setState(() => _isLoading = false);
     } else {
-      // Inicializar array con páginas vacías
-      _allPagesText = List.filled(widget.book.totalPages, '');
-      _loadCurrentPage();
-    }
-  }
-
-  Future<void> _loadCurrentPage() async {
-    // Si la página ya está cacheada, no recargar
-    if (_allPagesText[_currentPage - 1].isNotEmpty) {
-      _updateTextForCurrentPage();
-      return;
-    }
-    
-    setState(() => _isLoading = true);
-    
-    final provider = Provider.of<AppProvider>(context, listen: false);
-    final text = await provider.pdfService.extractTextFromPage(
-      widget.book.filePath,
-      _currentPage - 1,
-    );
-    
-    if (mounted) {
-      _allPagesText[_currentPage - 1] = text;
-      _updateTextForCurrentPage();
-      setState(() => _isLoading = false);
+      _loadAllPages();
     }
   }
 
@@ -85,28 +61,38 @@ class _TextViewScreenState extends State<TextViewScreen> {
     final provider = Provider.of<AppProvider>(context, listen: false);
     
     for (int i = 0; i < widget.book.totalPages; i++) {
-      // Solo cargar si no está ya cacheada
-      if (_allPagesText[i].isEmpty) {
-        final text = await provider.pdfService.extractTextFromPage(
-          widget.book.filePath,
-          i,
-        );
-        _allPagesText[i] = text;
-      }
+      final text = await provider.pdfService.extractTextFromPage(
+        widget.book.filePath,
+        i,
+      );
+      _allPagesText.add(text);
     }
     
     if (mounted) {
-      _updateTextForCurrentPage();
+      _buildFullTextWithSeparators();
       setState(() => _isLoading = false);
     }
   }
   
-  void _updateTextForCurrentPage() {
-    if (_currentPage > 0 && _currentPage <= _allPagesText.length) {
-      _textController.text = _allPagesText[_currentPage - 1];
-      // Resetear cursor al inicio de la página
-      _textController.selection = const TextSelection.collapsed(offset: 0);
+  void _buildFullTextWithSeparators() {
+    // Construir texto completo con separadores entre páginas
+    final StringBuffer fullText = StringBuffer();
+    
+    for (int i = 0; i < _allPagesText.length; i++) {
+      if (i > 0) {
+        fullText.write('\n\n');
+        fullText.write('─' * 50);
+        fullText.write('\n');
+        fullText.write('Página ${i + 1}');
+        fullText.write('\n');
+        fullText.write('─' * 50);
+        fullText.write('\n\n');
+      }
+      fullText.write(_allPagesText[i]);
     }
+    
+    _textController.text = fullText.toString();
+    _textController.selection = const TextSelection.collapsed(offset: 0);
   }
   
   void _goToNextPage() {
@@ -114,8 +100,6 @@ class _TextViewScreenState extends State<TextViewScreen> {
       setState(() {
         _currentPage++;
       });
-      _loadCurrentPage(); // Cargar página si no está cacheada
-      _scrollController.jumpTo(0); // Volver arriba
       
       final provider = Provider.of<AppProvider>(context, listen: false);
       provider.updateProgress(widget.book.id, _currentPage - 1, widget.book.totalPages);
@@ -127,22 +111,9 @@ class _TextViewScreenState extends State<TextViewScreen> {
       setState(() {
         _currentPage--;
       });
-      _loadCurrentPage(); // Cargar página si no está cacheada
-      _scrollController.jumpTo(0); // Volver arriba
       
       final provider = Provider.of<AppProvider>(context, listen: false);
       provider.updateProgress(widget.book.id, _currentPage - 1, widget.book.totalPages);
-    }
-  }
-  
-  void _handleMouseScroll(PointerScrollEvent event) {
-    // Detectar scroll con rueda del ratón
-    if (event.scrollDelta.dy > 0) {
-      // Scroll hacia abajo -> siguiente página
-      _goToNextPage();
-    } else if (event.scrollDelta.dy < 0) {
-      // Scroll hacia arriba -> página anterior
-      _goToPreviousPage();
     }
   }
 
@@ -287,8 +258,6 @@ class _TextViewScreenState extends State<TextViewScreen> {
                   setState(() {
                     _currentPage = pageNumber;
                   });
-                  _loadCurrentPage();
-                  _scrollController.jumpTo(0);
                   
                   final provider = Provider.of<AppProvider>(context, listen: false);
                   provider.updateProgress(widget.book.id, _currentPage - 1, widget.book.totalPages);
@@ -312,8 +281,6 @@ class _TextViewScreenState extends State<TextViewScreen> {
                 setState(() {
                   _currentPage = pageNumber;
                 });
-                _loadCurrentPage();
-                _scrollController.jumpTo(0);
                 
                 final provider = Provider.of<AppProvider>(context, listen: false);
                 provider.updateProgress(widget.book.id, _currentPage - 1, widget.book.totalPages);
@@ -385,18 +352,18 @@ class _TextViewScreenState extends State<TextViewScreen> {
                       SizedBox(height: 16),
                       Text('✨ Navegación con indicador arrastrable'),
                       SizedBox(height: 8),
-                      Text('🖱️ Scroll con rueda del ratón'),
+                      Text('� Separadores visuales entre páginas'),
                       SizedBox(height: 8),
-                      Text('📄 Paginación real (1 página PDF = 1 página texto)'),
+                      Text('✅ Todo el texto cargado con caché'),
                       SizedBox(height: 8),
-                      Text('✅ Carga lazy de páginas'),
+                      Text('✅ Marcadores "Página X" entre secciones'),
                       SizedBox(height: 8),
-                      Text('✅ Caché inteligente de páginas visitadas'),
+                      Text('✅ Scroll fluido por todo el documento'),
                       SizedBox(height: 8),
                       Text('✅ Vista PDF completamente limpia'),
                       SizedBox(height: 16),
                       Text(
-                        'Versión: v22-paginacion-real',
+                        'Versión: v23-separadores-pagina',
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
@@ -439,62 +406,29 @@ class _TextViewScreenState extends State<TextViewScreen> {
           Column(
             children: [
               Expanded(
-                child: Listener(
-                  onPointerSignal: (pointerSignal) {
-                    if (pointerSignal is PointerScrollEvent) {
-                      _handleMouseScroll(pointerSignal);
-                    }
-                  },
-                  child: Container(
-                    color: Colors.white,
-                    padding: const EdgeInsets.all(16),
-                    child: SingleChildScrollView(
-                      controller: _scrollController,
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Indicador de página en texto
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 6,
-                            ),
-                            margin: const EdgeInsets.only(bottom: 16),
-                            decoration: BoxDecoration(
-                              color: Colors.grey[200],
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              'Página $_currentPage de ${widget.book.totalPages}',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey[700],
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                          // Texto de la página
-                          TextField(
-                            controller: _textController,
-                            focusNode: _textFocusNode,
-                            maxLines: null,
-                            keyboardType: TextInputType.multiline,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              height: 1.5,
-                              color: Colors.black87,
-                            ),
-                            decoration: const InputDecoration(
-                              border: InputBorder.none,
-                              contentPadding: EdgeInsets.zero,
-                            ),
-                            onTap: () {
-                              _textFocusNode.requestFocus();
-                            },
-                          ),
-                        ],
+                child: Container(
+                  color: Colors.white,
+                  padding: const EdgeInsets.all(16),
+                  child: SingleChildScrollView(
+                    controller: _scrollController,
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    child: TextField(
+                      controller: _textController,
+                      focusNode: _textFocusNode,
+                      maxLines: null,
+                      keyboardType: TextInputType.multiline,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        height: 1.5,
+                        color: Colors.black87,
                       ),
+                      decoration: const InputDecoration(
+                        border: InputBorder.none,
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                      onTap: () {
+                        _textFocusNode.requestFocus();
+                      },
                     ),
                   ),
                 ),
@@ -540,8 +474,6 @@ class _TextViewScreenState extends State<TextViewScreen> {
                   // Cambiar página si es diferente
                   if (newPage != _currentPage && newPage >= 1 && newPage <= widget.book.totalPages) {
                     _currentPage = newPage;
-                    _loadCurrentPage();
-                    _scrollController.jumpTo(0);
                     
                     final provider = Provider.of<AppProvider>(context, listen: false);
                     provider.updateProgress(widget.book.id, _currentPage - 1, widget.book.totalPages);

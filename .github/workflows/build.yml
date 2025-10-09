@@ -49,14 +49,14 @@ jobs:
     
     - name: Rename APK with version
       run: |
-        VERSION="v22-paginacion-real"
+        VERSION="v23-separadores-pagina"
         BUILD_NUM="${{ github.run_number }}"
         mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/lector-pdf-${VERSION}-build${BUILD_NUM}.apk
     
     - name: Upload APK to artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: lector-pdf-v22-paginacion-real
+        name: lector-pdf-v23-separadores-pagina
         path: build/app/outputs/flutter-apk/lector-pdf-*.apk
         retention-days: 30
     
@@ -64,31 +64,30 @@ jobs:
       if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
       uses: softprops/action-gh-release@v1
       with:
-        tag_name: v22-build${{ github.run_number }}
-        name: Lector PDF v22 - Paginación Real - Build ${{ github.run_number }}
+        tag_name: v23-build${{ github.run_number }}
+        name: Lector PDF v23 - Separadores de Página - Build ${{ github.run_number }}
         body: |
-          ## 📱 Lector PDF - Versión con Paginación Real v22
+          ## 📱 Lector PDF - Versión con Separadores v23
           
           ### ✅ Mejoras Implementadas:
           - ✨ **Navegación con indicador arrastrable (slider vertical)**
-          - 🖱️ **Soporte para scroll con rueda del ratón**
-          - 📄 **Paginación real: 1 página PDF = 1 página texto**
-          - ✅ Carga lazy de páginas (solo se carga la página actual)
-          - ✅ Caché inteligente de páginas ya visitadas
-          - ✅ Indicador visual de página actual en el texto
+          - � **Separadores visuales entre páginas**
+          - ✅ Todo el texto cargado de una vez (caché instantáneo)
+          - ✅ Marcadores "Página X" entre secciones del texto
+          - ✅ Scroll fluido por todo el documento
           - ✅ Vista PDF completamente limpia
           
           ### 🎯 Cambios en esta versión:
-          - Vista TEXTO mantiene estructura de páginas del PDF original
-          - Scroll con rueda del ratón cambia de página
+          - Texto extraído completo con separadores visuales "──── Página X ────"
+          - Carga única al abrir (máxima rapidez)
+          - Scroll continuo por todo el documento
           - Indicador arrastrable funciona como slider de navegación
-          - Carga optimizada: solo se extrae texto cuando visitas una página
-          - Cada página de texto corresponde exactamente a su página PDF
+          - Caché se mantiene durante toda la sesión
           
           ### 🎮 Controles:
           - **Tap en indicador:** Abrir diálogo "Go to page"
           - **Arrastrar indicador:** Navegar entre páginas (slider vertical)
-          - **Rueda del ratón:** Subir/bajar páginas
+          - **Scroll normal:** Desplazarse por el texto completo
           - **Controles inferiores:** Play, pause, navegación
           
           ### 📦 Instalación:
