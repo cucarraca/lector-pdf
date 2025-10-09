@@ -341,20 +341,20 @@ class _TextViewScreenState extends State<TextViewScreen> {
                         ),
                       ),
                       SizedBox(height: 16),
-                      Text('✨ Interfaz ultra limpia en ambas vistas'),
+                      Text('✨ Indicador flotante en esquina (TEXTO)'),
                       SizedBox(height: 8),
-                      Text('❌ Sin indicadores flotantes'),
+                      Text('✅ Vista PDF completamente limpia'),
                       SizedBox(height: 8),
-                      Text('✅ Solo contenido (PDF o TEXTO)'),
+                      Text('✅ Número de página en esquina superior'),
                       SizedBox(height: 8),
-                      Text('✅ Navegación por controles inferiores'),
+                      Text('✅ Tap en indicador = navegación rápida'),
                       SizedBox(height: 8),
                       Text('✅ Caché de texto instantáneo'),
                       SizedBox(height: 8),
-                      Text('✅ Experiencia inmersiva'),
+                      Text('✅ Diseño minimalista y funcional'),
                       SizedBox(height: 16),
                       Text(
-                        'Versión: v20-ultra-limpio',
+                        'Versión: v21-indicador-esquina',
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
@@ -437,6 +437,32 @@ class _TextViewScreenState extends State<TextViewScreen> {
                 totalPages: widget.book.totalPages,
               ),
             ],
+          ),
+          // Indicador de página flotante (esquina superior derecha)
+          Positioned(
+            top: 16,
+            right: 16,
+            child: GestureDetector(
+              onTap: _showGoToPageDialog,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.black87,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  '$_currentPage',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
           ),
         ],
       ),

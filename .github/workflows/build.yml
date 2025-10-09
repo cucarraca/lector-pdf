@@ -49,14 +49,14 @@ jobs:
     
     - name: Rename APK with version
       run: |
-        VERSION="v20-ultra-limpio"
+        VERSION="v21-indicador-esquina"
         BUILD_NUM="${{ github.run_number }}"
         mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/lector-pdf-${VERSION}-build${BUILD_NUM}.apk
     
     - name: Upload APK to artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: lector-pdf-v20-ultra-limpio
+        name: lector-pdf-v21-indicador-esquina
         path: build/app/outputs/flutter-apk/lector-pdf-*.apk
         retention-days: 30
     
@@ -64,25 +64,26 @@ jobs:
       if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
       uses: softprops/action-gh-release@v1
       with:
-        tag_name: v20-build${{ github.run_number }}
-        name: Lector PDF v20 - Ultra Limpio - Build ${{ github.run_number }}
+        tag_name: v21-build${{ github.run_number }}
+        name: Lector PDF v21 - Indicador Esquina - Build ${{ github.run_number }}
         body: |
-          ## 📱 Lector PDF - Versión Ultra Limpia v20
+          ## 📱 Lector PDF - Versión con Indicador de Esquina v21
           
           ### ✅ Mejoras Implementadas:
-          - ✨ **Interfaz completamente limpia en AMBAS vistas**
-          - ❌ Eliminados TODOS los indicadores flotantes
-          - ❌ Sin hints ni notificaciones en pantalla
-          - ✅ Solo el contenido (PDF o TEXTO)
-          - ✅ Navegación por controles inferiores
+          - ✨ **Indicador de página en esquina superior derecha (TEXTO)**
+          - ✅ Vista PDF completamente limpia
+          - ✅ Vista TEXTO con número de página flotante
+          - ✅ Tap en indicador abre diálogo "Go to page"
+          - ✅ Navegación rápida por controles inferiores
           - ✅ Caché de texto instantáneo
-          - ✅ Experiencia de lectura inmersiva
+          - ✅ Experiencia de lectura optimizada
           
           ### 🎯 Cambios en esta versión:
-          - Vista PDF: Solo muestra el PDF (sin indicadores)
-          - Vista TEXTO: Solo muestra el texto (sin indicadores)
-          - Navegación visible en info de controles inferiores
-          - Máxima inmersión en la lectura
+          - Vista PDF: Completamente limpia (solo PDF)
+          - Vista TEXTO: Con indicador flotante en esquina superior derecha
+          - Indicador muestra número de página actual
+          - Al tocar el indicador, se abre diálogo de navegación
+          - Diseño minimalista y funcional
           
           ### 📦 Instalación:
           1. Descarga el APK
